@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Debug-only launcher icon background override, kept in sync with brand_accent purple. -->
+<!-- Debug-only launcher icon background override: white, matching release. The debug
+     build is distinguished by the purple tile color (ic_launcher_foreground), not the bg. -->
 <resources>
-    <color name="ic_launcher_background">#2A0F33</color>
+    <color name="ic_launcher_background">#FFFFFF</color>
 </resources>

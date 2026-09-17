@@ -124,8 +124,8 @@
             </LinearLayout>
         </FrameLayout>
 
-        <!-- Bottom navigation bar: Home / Music / History. Active tab is highlighted via
-             selector drawables (icon/text tint + a top indicator strip) driven by
+        <!-- Bottom navigation bar: Home / Music / History. Active tab is highlighted via a
+             color selector (icon/text tint only) driven by
              MobileBrowseFragment.setBottomNavSelected() toggling View.setSelected(). -->
         <LinearLayout
             android:id="@+id/mobile_bottom_nav_bar"
@@ -141,8 +141,7 @@
                 android:layout_weight="1"
                 android:orientation="vertical"
                 android:gravity="center"
-                android:background="?android:attr/selectableItemBackground"
-                android:foreground="@drawable/bottom_nav_selected_indicator">
+                android:background="?android:attr/selectableItemBackground">
                 <ImageView android:layout_width="24dp" android:layout_height="24dp"
                     android:src="@drawable/ic_shorts_nav_home"
                     android:tint="@color/bottom_nav_icon_color"
@@ -161,8 +160,7 @@
                 android:layout_weight="1"
                 android:orientation="vertical"
                 android:gravity="center"
-                android:background="?android:attr/selectableItemBackground"
-                android:foreground="@drawable/bottom_nav_selected_indicator">
+                android:background="?android:attr/selectableItemBackground">
                 <ImageView android:layout_width="24dp" android:layout_height="24dp"
                     android:src="@drawable/icon_music"
                     android:tint="@color/bottom_nav_icon_color"
@@ -181,8 +179,7 @@
                 android:layout_weight="1"
                 android:orientation="vertical"
                 android:gravity="center"
-                android:background="?android:attr/selectableItemBackground"
-                android:foreground="@drawable/bottom_nav_selected_indicator">
+                android:background="?android:attr/selectableItemBackground">
                 <ImageView android:layout_width="24dp" android:layout_height="24dp"
                     android:src="@drawable/ic_shorts_nav_history"
                     android:tint="@color/bottom_nav_icon_color"

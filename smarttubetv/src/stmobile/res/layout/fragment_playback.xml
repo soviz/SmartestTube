@@ -362,10 +362,10 @@
 
     <!--
         Shorts bottom navigation bar: Home / Music / History. Same layout/styling as the Home
-        screen's mobile_bottom_nav_bar (mobile_browse_fragment.xml) - selector-driven icon/text
-        tint + top indicator strip for the active tab - so the bar reads identically everywhere
-        in the app. Visible in strip mode (portrait, or any non-full-screen player state);
-        managed by MobilePlaybackFragment.applyMobileLayout().
+        screen's mobile_bottom_nav_bar (mobile_browse_fragment.xml) - a color selector on the
+        icon/text tint marks the active tab - so the bar reads identically everywhere in the
+        app. Visible in strip mode (portrait, or any non-full-screen player state); managed by
+        MobilePlaybackFragment.applyMobileLayout().
     -->
     <LinearLayout
         android:id="@+id/mobile_shorts_nav_bar"
@@ -385,8 +385,7 @@
             android:layout_weight="1"
             android:orientation="vertical"
             android:gravity="center"
-            android:background="?android:attr/selectableItemBackground"
-            android:foreground="@drawable/bottom_nav_selected_indicator">
+            android:background="?android:attr/selectableItemBackground">
             <ImageView android:layout_width="24dp" android:layout_height="24dp"
                 android:src="@drawable/ic_shorts_nav_home"
                 android:tint="@color/bottom_nav_icon_color"
@@ -405,8 +404,7 @@
             android:layout_weight="1"
             android:orientation="vertical"
             android:gravity="center"
-            android:background="?android:attr/selectableItemBackground"
-            android:foreground="@drawable/bottom_nav_selected_indicator">
+            android:background="?android:attr/selectableItemBackground">
             <ImageView android:layout_width="24dp" android:layout_height="24dp"
                 android:src="@drawable/icon_music"
                 android:tint="@color/bottom_nav_icon_color"
@@ -425,8 +423,7 @@
             android:layout_weight="1"
             android:orientation="vertical"
             android:gravity="center"
-            android:background="?android:attr/selectableItemBackground"
-            android:foreground="@drawable/bottom_nav_selected_indicator">
+            android:background="?android:attr/selectableItemBackground">
             <ImageView android:layout_width="24dp" android:layout_height="24dp"
                 android:src="@drawable/ic_shorts_nav_history"
                 android:tint="@color/bottom_nav_icon_color"

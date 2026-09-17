@@ -772,7 +772,7 @@ public class MobilePlaybackFragment extends PlaybackFragment {
             set.setDimensionRatio(R.id.playback_controls_fragment, ratio);
             set.setVisibility(R.id.mobile_below_video_panel, showPanel ? View.VISIBLE : View.GONE);
             set.setVisibility(R.id.mobile_shorts_info_bar, isShorts ? View.VISIBLE : View.GONE);
-            set.setVisibility(R.id.mobile_shorts_nav_bar, View.GONE);
+            set.setVisibility(R.id.mobile_shorts_nav_bar, View.VISIBLE);
         } else {
             set.connect(R.id.playback_controls_fragment, ConstraintSet.BOTTOM,
                     ConstraintSet.PARENT_ID, ConstraintSet.BOTTOM);
