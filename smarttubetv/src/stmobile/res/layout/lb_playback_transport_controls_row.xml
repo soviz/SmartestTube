@@ -93,14 +93,82 @@
                         android:layoutDirection="ltr"
                         android:paddingStart="8dp"
                         android:paddingEnd="8dp"
+                        android:paddingTop="4dp"
+                        android:paddingBottom="24dp"
                         tools:ignore="RtlHardcoded" >
 
+            <!-- Phone: Previous / Play / Next centered (YouTube-style), not pinned to the start
+                 edge like the TV remote-focused layout, and lifted off the seek bar (the extra
+                 top/bottom padding above) so it reads as sitting near the middle of the video
+                 strip rather than hugging the bottom edge. See VideoPlayerGlue#setCompactControls
+                 for the Previous-Play-Next action order that lands Play in the visual middle. -->
             <FrameLayout
                 android:id="@+id/controls_dock"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_alignParentStart="true"
+                android:layout_centerHorizontal="true"
             />
+
+            <!-- Phone: Remaining/current-total time block moved up here, top-end of the controls
+                 row (next to Previous/Play/Next), instead of its Leanback-default spot lower down
+                 next to CC/HQ. Ids (ending_time/current_time/separate_time/total_time) are
+                 resolved by PlaybackTransportRowPresenter - only their position in the tree
+                 changed, not their ids. Smaller text (11sp, was 14sp) and a top margin (nudged
+                 further down off the row's very top edge per feedback) so it reads as a lighter
+                 secondary label next to the much bigger Previous/Play/Next buttons instead of
+                 competing with them. -->
+            <RelativeLayout android:id="@+id/time_info"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layoutDirection="ltr"
+                            android:layout_alignParentEnd="true"
+                            android:layout_alignParentTop="true"
+                            android:layout_marginTop="28dp"
+                            android:focusable="false" >
+                <TextView
+                    android:id="@+id/ending_time"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentEnd="true"
+                    android:textSize="11sp"
+                    style="?attr/playbackControlsTimeStyle" />
+
+                <RelativeLayout android:id="@+id/current_time_wrapper"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layoutDirection="ltr"
+                                android:layout_alignParentEnd="true"
+                                android:layout_below="@+id/ending_time"
+                                android:focusable="false" >
+                    <TextView
+                        android:id="@+id/current_time"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_toStartOf="@+id/separate_time"
+                        android:layout_marginStart="@dimen/lb_playback_transport_time_margin"
+                        android:textSize="11sp"
+                        style="?attr/playbackControlsTimeStyle" />
+
+                    <TextView
+                        android:id="@+id/separate_time"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/lb_playback_time_separator"
+                        android:layout_toStartOf="@+id/total_time"
+                        android:layout_marginStart="@dimen/lb_playback_transport_time_margin"
+                        android:textSize="11sp"
+                        style="?attr/playbackControlsTimeStyle" />
+
+                    <TextView
+                        android:id="@+id/total_time"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentEnd="true"
+                        android:layout_marginStart="@dimen/lb_playback_transport_time_margin"
+                        android:textSize="11sp"
+                        style="?attr/playbackControlsTimeStyle" />
+                </RelativeLayout>
+            </RelativeLayout>
 
             <RelativeLayout android:id="@+id/additional_info"
                             android:layout_width="wrap_content"
@@ -128,72 +196,28 @@
             </RelativeLayout>
         </RelativeLayout>
 
-        <!-- Phone: secondary controls + time info ABOVE the seek bar, at half the TV text size. -->
-        <RelativeLayout android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layoutDirection="ltr"
-                        android:paddingStart="8dp"
-                        android:paddingEnd="8dp"
-                        tools:ignore="RtlHardcoded" >
+        <!-- Phone: secondary controls (CC/HQ/chat) below the transport row, above the seek bar.
+             Row height is pinned to lb_control_button_height (the same dimen the buttons inside
+             it use) purely so its on-screen vertical center is a known, fixed distance above the
+             seek bar - the fullscreen toggle overlay (mobile_fullscreen_btn, a plain sibling view
+             in fragment_playback.xml, kept there because MobilePlaybackFragment resolves it via a
+             simple activity.findViewById() before this dynamically-inflated row ever exists) uses
+             that same math for its own marginBottom so it lines up with this row instead of
+             floating separately over the video. -->
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/lb_control_button_height"
+            android:layoutDirection="ltr"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            tools:ignore="RtlHardcoded" >
             <FrameLayout
                 android:id="@+id/secondary_controls_dock"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_alignParentStart="true" >
+                android:layout_alignParentStart="true"
+                android:layout_centerVertical="true" >
             </FrameLayout>
-
-            <RelativeLayout android:id="@+id/time_info"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layoutDirection="ltr"
-                            android:layout_gravity="bottom"
-                            android:layout_alignParentEnd="true"
-                            android:layout_centerVertical="true"
-                            android:focusable="false" >
-                <TextView
-                    android:id="@+id/ending_time"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_alignParentEnd="true"
-                    android:textSize="14sp"
-                    style="?attr/playbackControlsTimeStyle" />
-
-                <RelativeLayout android:id="@+id/current_time_wrapper"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layoutDirection="ltr"
-                                android:layout_alignParentEnd="true"
-                                android:layout_below="@+id/ending_time"
-                                android:focusable="false" >
-                    <TextView
-                        android:id="@+id/current_time"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_toStartOf="@+id/separate_time"
-                        android:layout_marginStart="@dimen/lb_playback_transport_time_margin"
-                        android:textSize="14sp"
-                        style="?attr/playbackControlsTimeStyle" />
-
-                    <TextView
-                        android:id="@+id/separate_time"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/lb_playback_time_separator"
-                        android:layout_toStartOf="@+id/total_time"
-                        android:layout_marginStart="@dimen/lb_playback_transport_time_margin"
-                        android:textSize="14sp"
-                        style="?attr/playbackControlsTimeStyle" />
-
-                    <TextView
-                        android:id="@+id/total_time"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_alignParentEnd="true"
-                        android:layout_marginStart="@dimen/lb_playback_transport_time_margin"
-                        android:textSize="14sp"
-                        style="?attr/playbackControlsTimeStyle" />
-                </RelativeLayout>
-            </RelativeLayout>
         </RelativeLayout>
 
         <!-- Phone: seek bar last — hugs the bottom edge of the video, YouTube-style. -->

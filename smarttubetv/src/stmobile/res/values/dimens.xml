@@ -7,6 +7,13 @@
 <resources>
     <dimen name="mobile_drawer_width">280dp</dimen>
 
+    <!-- Bottom nav bar (Home/Music/History) content height, same value on the Home screen
+         (mobile_browse_fragment.xml) and the player (fragment_playback.xml). Referenced from
+         Java too: MobilePlaybackFragment grows the player bar's actual view height by the
+         system nav bar inset on top of this, via padding, so its background still fills that
+         space instead of leaving it bare. -->
+    <dimen name="mobile_bottom_nav_bar_height">56dp</dimen>
+
     <!--
         Phone override: the TV default frames captions with 150sp of horizontal padding on
         each side, which collapses the caption box to near-zero width on a ~360dp phone and
@@ -20,4 +27,11 @@
         of the video, YouTube-style.
     -->
     <dimen name="lb_playback_controls_padding_bottom">4dp</dimen>
+
+    <!-- Phone override: bigger primary transport buttons (Previous/Play/Next) than the TV
+         10-foot default, and bigger icons inside them, for touch targets and visibility. -->
+    <dimen name="lb_control_button_diameter">108dp</dimen>
+    <dimen name="lb_control_button_height">76dp</dimen>
+    <dimen name="lb_control_icon_width">40dp</dimen>
+    <dimen name="lb_control_icon_height">40dp</dimen>
 </resources>

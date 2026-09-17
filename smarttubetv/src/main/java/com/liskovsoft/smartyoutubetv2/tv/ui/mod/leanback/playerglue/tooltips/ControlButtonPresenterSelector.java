@@ -106,6 +106,13 @@ public class ControlButtonPresenterSelector extends PresenterSelector {
             ActionViewHolder vh = (ActionViewHolder) viewHolder;
 
             vh.mIcon.setImageDrawable(action.getIcon());
+            // MOD (phone): the compact (Previous/Play/Next) transport row centers Play as the
+            // primary action - scale it up so it reads as the emphasized control, matching the
+            // official YouTube app. Visual-only (ImageView content scale); the tappable button
+            // background and TV focus/remote handling are untouched.
+            float scale = action instanceof PlaybackControlsRow.PlayPauseAction ? 1.4f : 1f;
+            vh.mIcon.setScaleX(scale);
+            vh.mIcon.setScaleY(scale);
             if (action instanceof PaddingAction) {
                 int padding = ((PaddingAction) action).getPadding();
                 if (padding > 0) {

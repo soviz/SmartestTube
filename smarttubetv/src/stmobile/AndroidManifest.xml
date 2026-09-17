@@ -90,7 +90,7 @@
             android:screenOrientation="behind"
             android:supportsPictureInPicture="true"
             android:resizeableActivity="true"
-            android:theme="@style/App.Theme.Leanback.Player" />
+            android:theme="@style/Theme.SmarterTube.Mobile.Player" />
 
         <!-- Native phone settings dialog (Phase 4 part 2). screenOrientation="behind" so
              dialogs opened from the landscape player stay landscape and dialogs opened

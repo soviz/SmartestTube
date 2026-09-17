@@ -6,6 +6,8 @@ import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.os.Bundle;
 import android.util.DisplayMetrics;
+import android.view.View;
+import android.view.ViewGroup;
 
 import androidx.annotation.Nullable;
 
@@ -63,6 +65,19 @@ public abstract class MobileActivity extends MotherActivity {
     }
 
     /**
+     * Every non-player phone screen (Home, search, channel, sign-in, ...) should always show the
+     * system status/navigation bars — only the player's landscape full-screen mode hides them
+     * (see MobilePlaybackFragment.applySystemBarsVisibility(), which uses the same {@link
+     * SystemBarsHelper}).
+     */
+    private void showSystemBars() {
+        View content = findViewById(android.R.id.content);
+        if (content instanceof ViewGroup) {
+            SystemBarsHelper.show(getWindow(), (ViewGroup) content);
+        }
+    }
+
+    /**
      * The content activities (browse/search/channel/sign-in) are locked to portrait in
      * the manifest - the right default on a phone. On a tablet (smallestWidth >= 600dp)
      * we want them to rotate so the {@code values-sw600dp-land} resources (4-column grids)
@@ -83,6 +98,10 @@ public abstract class MobileActivity extends MotherActivity {
     protected void onResume() {
         super.onResume();
         restoreRealDensity();
+        // Called here (not onCreate) so it runs after the subclass's own setContentView() -
+        // AppCompat's first setContentView() re-installs the decor view and was silently
+        // reverting an onCreate-time setDecorFitsSystemWindows(true) back to edge-to-edge.
+        showSystemBars();
         // Register in the ViewManager activity stack (the TV LeanbackActivity does the same).
         // Without this the stack only tracks TV/Leanback activities, so the player's
         // startParentView() can't see a phone screen as its caller and falls back to Home.

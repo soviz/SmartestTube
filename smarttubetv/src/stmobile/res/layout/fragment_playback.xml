@@ -93,6 +93,28 @@
         android:layout_marginTop="4dp" />
 
     <!--
+        Fullscreen toggle: bottom-right of the video, sized and vertically aligned to sit near the
+        Leanback CC/HQ/chat row (lb_playback_transport_controls_row.xml's secondary_controls_row)
+        rather than the video's own corner. It stays a plain sibling view here (not inside that
+        dynamically-inflated Leanback row) because MobilePlaybackFragment resolves it via a simple
+        activity.findViewById() before the row is ever bound. marginBottom nudged back down
+        (52dp, was 60dp) per feedback that it had gone slightly too high.
+    -->
+    <ImageButton
+        android:id="@+id/mobile_fullscreen_btn"
+        android:layout_width="@dimen/lb_control_button_height"
+        android:layout_height="@dimen/lb_control_button_height"
+        android:src="@drawable/ic_fullscreen_enter"
+        android:background="@android:color/transparent"
+        android:scaleType="center"
+        android:visibility="visible"
+        android:contentDescription="@string/mobile_fullscreen_toggle"
+        app:layout_constraintEnd_toEndOf="@id/playback_controls_fragment"
+        app:layout_constraintBottom_toBottomOf="@id/playback_controls_fragment"
+        android:layout_marginEnd="8dp"
+        android:layout_marginBottom="52dp" />
+
+    <!--
         Shorts overlay: centred play/pause indicator (not interactive — tap-anywhere logic in
         MobilePlaybackFragment.handleShortsTouchEvent shows/fades this icon on each tap).
     -->
@@ -339,16 +361,19 @@
     </LinearLayout>
 
     <!--
-        Shorts bottom navigation bar: Home / Shorts / Subscriptions / Playlists / You.
-        Visible only in Shorts mode (state 2); managed by MobilePlaybackFragment.applyMobileLayout().
+        Shorts bottom navigation bar: Home / Music / History. Same layout/styling as the Home
+        screen's mobile_bottom_nav_bar (mobile_browse_fragment.xml) - selector-driven icon/text
+        tint + top indicator strip for the active tab - so the bar reads identically everywhere
+        in the app. Visible in strip mode (portrait, or any non-full-screen player state);
+        managed by MobilePlaybackFragment.applyMobileLayout().
     -->
     <LinearLayout
         android:id="@+id/mobile_shorts_nav_bar"
         android:layout_width="0dp"
-        android:layout_height="56dp"
+        android:layout_height="@dimen/mobile_bottom_nav_bar_height"
         android:orientation="horizontal"
         android:visibility="gone"
-        android:background="#DD000000"
+        android:background="@color/mobile_surface"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
@@ -360,73 +385,59 @@
             android:layout_weight="1"
             android:orientation="vertical"
             android:gravity="center"
-            android:background="?android:attr/selectableItemBackground">
-            <ImageView android:layout_width="30dp" android:layout_height="30dp"
-                android:src="@drawable/ic_shorts_nav_home"/>
+            android:background="?android:attr/selectableItemBackground"
+            android:foreground="@drawable/bottom_nav_selected_indicator">
+            <ImageView android:layout_width="24dp" android:layout_height="24dp"
+                android:src="@drawable/ic_shorts_nav_home"
+                android:tint="@color/bottom_nav_icon_color"
+                android:duplicateParentState="true"/>
             <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
                 android:paddingTop="2dp"
-                android:textSize="11sp" android:text="Home" android:textColor="@android:color/white"/>
+                android:textSize="11sp" android:text="@string/header_home"
+                android:textColor="@color/bottom_nav_icon_color"
+                android:duplicateParentState="true"/>
         </LinearLayout>
 
         <LinearLayout
-            android:id="@+id/shorts_nav_shorts"
+            android:id="@+id/shorts_nav_music"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
             android:orientation="vertical"
             android:gravity="center"
-            android:background="?android:attr/selectableItemBackground">
-            <ImageView android:layout_width="30dp" android:layout_height="30dp"
-                android:src="@drawable/ic_shorts_nav_shorts"/>
+            android:background="?android:attr/selectableItemBackground"
+            android:foreground="@drawable/bottom_nav_selected_indicator">
+            <ImageView android:layout_width="24dp" android:layout_height="24dp"
+                android:src="@drawable/icon_music"
+                android:tint="@color/bottom_nav_icon_color"
+                android:duplicateParentState="true"/>
             <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
                 android:paddingTop="2dp"
-                android:textSize="11sp" android:text="Shorts" android:textColor="@android:color/white"/>
+                android:textSize="11sp" android:text="@string/header_music"
+                android:textColor="@color/bottom_nav_icon_color"
+                android:duplicateParentState="true"/>
         </LinearLayout>
 
         <LinearLayout
-            android:id="@+id/shorts_nav_subscriptions"
+            android:id="@+id/shorts_nav_history"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
             android:orientation="vertical"
             android:gravity="center"
-            android:background="?android:attr/selectableItemBackground">
-            <ImageView android:layout_width="30dp" android:layout_height="30dp"
-                android:src="@drawable/ic_shorts_nav_subs"/>
+            android:background="?android:attr/selectableItemBackground"
+            android:foreground="@drawable/bottom_nav_selected_indicator">
+            <ImageView android:layout_width="24dp" android:layout_height="24dp"
+                android:src="@drawable/ic_shorts_nav_history"
+                android:tint="@color/bottom_nav_icon_color"
+                android:duplicateParentState="true"/>
             <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
                 android:paddingTop="2dp"
-                android:textSize="11sp" android:text="Subscriptions" android:textColor="@android:color/white"/>
+                android:textSize="11sp" android:text="@string/header_history"
+                android:textColor="@color/bottom_nav_icon_color"
+                android:duplicateParentState="true"/>
         </LinearLayout>
 
-        <LinearLayout
-            android:id="@+id/shorts_nav_playlists"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:orientation="vertical"
-            android:gravity="center"
-            android:background="?android:attr/selectableItemBackground">
-            <ImageView android:layout_width="30dp" android:layout_height="30dp"
-                android:src="@drawable/ic_shorts_nav_playlists"/>
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:paddingTop="2dp"
-                android:textSize="11sp" android:text="Playlists" android:textColor="@android:color/white"/>
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/shorts_nav_you"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:orientation="vertical"
-            android:gravity="center"
-            android:background="?android:attr/selectableItemBackground">
-            <ImageView android:layout_width="30dp" android:layout_height="30dp"
-                android:src="@drawable/ic_shorts_nav_you"/>
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:paddingTop="2dp"
-                android:textSize="11sp" android:text="You" android:textColor="@android:color/white"/>
-        </LinearLayout>
     </LinearLayout>
 
     <!--

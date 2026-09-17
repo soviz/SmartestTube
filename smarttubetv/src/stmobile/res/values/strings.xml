@@ -17,6 +17,10 @@
     <string name="mobile_search_voice_prompt">Speak to search</string>
     <string name="mobile_search_voice_unavailable">Voice search isn\'t available on this device.</string>
 
+    <!-- Player bottom nav bar -->
+    <string name="header_you">You</string>
+    <string name="mobile_fullscreen_toggle">Toggle fullscreen</string>
+
     <!-- About screen -->
     <string name="mobile_about_title">About SmarterTube</string>
     <string name="mobile_about_drawer_entry">About SmarterTube</string>

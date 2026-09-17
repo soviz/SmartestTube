@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- "Exit fullscreen" - diagonal arrows pointing inward, matching the system PiP collapse glyph. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="40dp"
+    android:height="40dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M6,16h4v4h2v-6L6,14v2zM10,4L8,4v4L4,8v2h6L10,4zM14,20h2v-4h4v-2h-6v6zM16,8L16,4h-2v6h6L20,8h-4z"/>
+</vector>

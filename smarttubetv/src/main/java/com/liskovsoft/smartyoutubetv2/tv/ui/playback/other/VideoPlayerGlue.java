@@ -271,17 +271,26 @@ public class VideoPlayerGlue extends MaxControlsVideoPlayerGlue<PlayerAdapter> i
         }
 
         if (compact) {
-            super.onCreatePrimaryActions(primary); // play/pause
+            // Previous / Play / Next, in that visual order (Leanback lays primary actions out
+            // left-to-right) - the official YouTube app's own compact transport layout, and puts
+            // the most-used action (play/pause) at the natural thumb position in the middle
+            // instead of the far left.
             primary.add(mSkipPreviousAction);
+            super.onCreatePrimaryActions(primary); // play/pause
             primary.add(mSkipNextAction);
-            if (mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_CHAT)) {
-                primary.add(mActions.get(R.id.action_chat));
-            }
-            if (mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_SUBTITLES)) {
-                primary.add(mActions.get(R.id.lb_control_closed_captioning));
-            }
-            if (mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_HIGH_QUALITY)) {
-                primary.add(mActions.get(R.id.lb_control_high_quality));
+            // Everything else goes on the secondary row BELOW the transport row (its own dock in
+            // lb_playback_transport_controls_row.xml) instead of crowding the primary row, so
+            // Previous/Play/Next stay the only thing sharing that centered row.
+            if (secondary != null) {
+                if (mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_CHAT)) {
+                    secondary.add(mActions.get(R.id.action_chat));
+                }
+                if (mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_SUBTITLES)) {
+                    secondary.add(mActions.get(R.id.lb_control_closed_captioning));
+                }
+                if (mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_HIGH_QUALITY)) {
+                    secondary.add(mActions.get(R.id.lb_control_high_quality));
+                }
             }
         } else {
             onCreatePrimaryActions(primary);

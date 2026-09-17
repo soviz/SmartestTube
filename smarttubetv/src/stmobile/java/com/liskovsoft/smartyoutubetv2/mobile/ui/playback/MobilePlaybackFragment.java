@@ -3,15 +3,18 @@ package com.liskovsoft.smartyoutubetv2.mobile.ui.playback;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.ActivityInfo;
 import android.content.res.Configuration;
 import android.os.Build.VERSION;
 import android.os.Build.VERSION_CODES;
 import android.os.Handler;
 import android.support.v4.media.session.MediaSessionCompat;
+import android.view.Window;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.widget.CheckBox;
 import android.widget.ImageButton;
@@ -26,6 +29,11 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import androidx.core.content.ContextCompat;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 
 import com.bumptech.glide.Glide;
 import com.liskovsoft.mediaserviceinterfaces.MediaItemService;
@@ -84,13 +92,25 @@ public class MobilePlaybackFragment extends PlaybackFragment {
     private boolean mStripMode;
     /** Applied layout: 0 = full-screen, 1 = regular 16:9 strip, 2 = Shorts 9:16 strip. */
     private int mLayoutState;
+    /** mobile_shorts_nav_bar's XML height (56dp) in px - its content area, before any nav-bar
+     *  inset padding grows the view's total height. Captured once from its laid-out height on
+     *  first use; see applySystemBarsMargins(). */
+    private int mNavBarContentHeightPx = -1;
     private String mLastVideoId;
     private VideoPlayerGlue mLastGlue;
     private boolean mLastCompact;
 
+    // Swipe-down-to-minimize gesture tracking (non-Shorts only — Shorts uses vertical drag for
+    // its own page swipe). See interceptPlayerTouch()/handleWindowedSwipeEvent().
+    private float mWindowedSwipeStartX;
+    private float mWindowedSwipeStartY;
+    private boolean mWindowedSwipeTracking;
+    private boolean mWindowedSwipeTriggered;
+
     // Shorts-specific chrome (action rail + back button + info bar below video).
     private View mShortsActionRail;
     private ImageButton mShortsBackBtn;
+    private ImageButton mFullscreenBtn;
     private LinearLayout mShortsInfoBar;
     private TextView mShortsTitleView;
     private TextView mShortsChannelView;
@@ -511,9 +531,14 @@ public class MobilePlaybackFragment extends PlaybackFragment {
         View playerView = getView();
         if (playerView == null) return false;
 
-        // Shorts: all touch is managed here (drag pager + tap-to-toggle).
+        // Shorts: all touch is managed here (drag pager + tap-to-toggle). No swipe-to-minimize —
+        // vertical drag is already the Short-to-Short page swipe.
         if (mLayoutState == 2) {
             return handleShortsTouchEvent(event);
+        }
+
+        if (handleWindowedSwipeEvent(event, playerView)) {
+            return true;
         }
 
         // Non-Shorts: original phantom-tap guard.
@@ -521,6 +546,48 @@ public class MobilePlaybackFragment extends PlaybackFragment {
         if (event.getY() > playerView.getBottom()) return false;
         onDispatchTouchEvent(event); // overlay tickle + double-tap seek
         return true;
+    }
+
+    /**
+     * Swipe-down-to-minimize (mirrors the official YouTube app): a downward drag starting on the
+     * video surface, in the portrait strip or landscape full-screen (never Shorts, never over the
+     * below-video panel), hands the player to {@link MobilePlaybackActivity#enterWindowedMode()}
+     * once it clears a generous slop — well past Leanback's own tap/seek gestures, so an ordinary
+     * tap-to-reveal-controls or double-tap-to-seek is never swallowed as a false trigger.
+     */
+    private boolean handleWindowedSwipeEvent(MotionEvent event, View playerView) {
+        switch (event.getActionMasked()) {
+            case MotionEvent.ACTION_DOWN:
+                mWindowedSwipeTracking = event.getY() <= playerView.getBottom();
+                mWindowedSwipeTriggered = false;
+                mWindowedSwipeStartX = event.getRawX();
+                mWindowedSwipeStartY = event.getRawY();
+                return false; // let the down-event fall through to the normal tap handling too
+            case MotionEvent.ACTION_MOVE:
+                if (!mWindowedSwipeTracking || mWindowedSwipeTriggered) {
+                    return mWindowedSwipeTriggered;
+                }
+                float dx = event.getRawX() - mWindowedSwipeStartX;
+                float dy = event.getRawY() - mWindowedSwipeStartY;
+                int slop = ViewConfiguration.get(playerView.getContext()).getScaledTouchSlop() * 6;
+                if (dy > slop && dy > Math.abs(dx) * 2) {
+                    mWindowedSwipeTriggered = true;
+                    Activity activity = getActivity();
+                    if (activity instanceof MobilePlaybackActivity) {
+                        ((MobilePlaybackActivity) activity).enterWindowedMode();
+                    }
+                    return true;
+                }
+                return false;
+            case MotionEvent.ACTION_UP:
+            case MotionEvent.ACTION_CANCEL:
+                boolean wasTriggered = mWindowedSwipeTriggered;
+                mWindowedSwipeTracking = false;
+                mWindowedSwipeTriggered = false;
+                return wasTriggered;
+            default:
+                return false;
+        }
     }
 
     private boolean handleShortsTouchEvent(MotionEvent event) {
@@ -636,15 +703,28 @@ public class MobilePlaybackFragment extends PlaybackFragment {
         boolean inPip = isInPipMode();
 
         // Strip mode now also covers Shorts: the player becomes a top-aligned aspect-ratio strip
-        // instead of a vertically-centered full-screen surface. Regular videos get a 16:9 strip with
-        // the up-next panel below; a Short gets a 9:16 strip with the Shorts info bar + action rail.
+        // instead of a vertically-centered full-screen surface. Regular videos get a 4:3 strip
+        // (taller than the source 16:9 video - ExoPlayer letterboxes it - so the strip itself
+        // takes up noticeably more of the screen than a strict 16:9 box would) with the up-next
+        // panel below; a Short gets a 9:16 strip with the Shorts info bar + action rail.
         boolean strip = portrait && !inPip && video != null;
         boolean showPanel = strip && !isShorts;
-        String ratio = isShorts ? "H,9:16" : "H,16:9";
+        String ratio = isShorts ? "H,9:16" : "H,4:3";
 
         syncCompactControls(strip);
 
         applyOverlayDecorVisibility(strip);
+
+        // System status/navigation bars: visible everywhere except landscape full-screen
+        // playback (matches strip - true in every other player state, including Shorts).
+        applySystemBarsVisibility(strip);
+
+        // Fullscreen toggle icon: offer to enter fullscreen while in the strip, exit while
+        // already full-screen. Kept outside the early-return below so it stays correct even on
+        // a call that doesn't otherwise change the layout.
+        if (mFullscreenBtn != null) {
+            mFullscreenBtn.setImageResource(strip ? R.drawable.ic_fullscreen_enter : R.drawable.ic_fullscreen_exit);
+        }
 
         // Keyed on the 3-value state (not just the boolean) so a regular<->Shorts switch — both of
         // which are "strip" — still re-applies the new dimension ratio.
@@ -732,8 +812,9 @@ public class MobilePlaybackFragment extends PlaybackFragment {
         // Non-Shorts: ensure the control row is visible after the lazy inflate. In Shorts the
         // control row (transport buttons + seek bar + time) is owned by setShortsChrome.
         if (mLayoutState != 2) setShortsControlsVisible(true);
-        // Back button follows the player controls on all non-Shorts pages.
+        // Back button and fullscreen toggle follow the player controls on all non-Shorts pages.
         if (mShortsBackBtn != null && mLayoutState != 2) mShortsBackBtn.setVisibility(View.VISIBLE);
+        if (mFullscreenBtn != null && mLayoutState != 2) mFullscreenBtn.setVisibility(View.VISIBLE);
     }
 
     @Override
@@ -744,6 +825,7 @@ public class MobilePlaybackFragment extends PlaybackFragment {
         // animation that left the seek bar stuck near the top of the screen.
         if (mLayoutState == 2) return;
         if (mShortsBackBtn != null) mShortsBackBtn.setVisibility(View.INVISIBLE);
+        if (mFullscreenBtn != null) mFullscreenBtn.setVisibility(View.INVISIBLE);
         super.hideControlsOverlay(runAnimation);
     }
 
@@ -1292,6 +1374,103 @@ public class MobilePlaybackFragment extends PlaybackFragment {
     }
 
     /**
+     * Fullscreen toggle button: flips between the portrait strip and landscape full-screen.
+     * A regular video's requestedOrientation is SCREEN_ORIENTATION_FULL_USER (free rotation,
+     * see MobilePlaybackActivity.applyOrientationForCurrentVideo) — this temporarily overrides
+     * it with an explicit LANDSCAPE/PORTRAIT lock so the tap has an immediate, predictable
+     * effect regardless of the device's physical orientation or auto-rotate setting. Reverting
+     * to free rotation on every subsequent layout pass would fight a still-portrait device back
+     * out of the fullscreen the user just asked for, so the explicit lock is left in place.
+     */
+    private void toggleFullscreen() {
+        Activity activity = getActivity();
+        if (activity == null) {
+            return;
+        }
+        boolean currentlyPortrait =
+                getResources().getConfiguration().orientation == Configuration.ORIENTATION_PORTRAIT;
+        activity.setRequestedOrientation(currentlyPortrait
+                ? ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                : ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+    }
+
+    /**
+     * Shows/hides the system status and navigation bars. {@code visible=false} is used only for
+     * landscape full-screen video (the one case a phone player should behave like a classic
+     * immersive video player); every other player state (strip, Shorts, PiP) keeps them shown.
+     *
+     * Unlike {@code MobileActivity} (a plain screen where padding the whole content root works
+     * fine), mRoot here is a ConstraintLayout juggling several constraint-driven siblings (the
+     * video strip, its overlay buttons, the nav bar) - padding the root alone left them visually
+     * unmoved in practice, so this instead resolves the current insets once and applies them as
+     * explicit margins directly on the two views that actually need to clear the bars: the video
+     * strip's top (pushes the back/fullscreen overlay buttons down with it, since they're
+     * constrained to its edges) and the nav bar's bottom.
+     */
+    private void applySystemBarsVisibility(boolean visible) {
+        Activity activity = getActivity();
+        if (activity == null || mRoot == null) {
+            return;
+        }
+        Window window = activity.getWindow();
+        WindowCompat.setDecorFitsSystemWindows(window, visible);
+        WindowInsetsControllerCompat controller =
+                new WindowInsetsControllerCompat(window, window.getDecorView());
+        if (visible) {
+            controller.show(WindowInsetsCompat.Type.systemBars());
+        } else {
+            controller.setSystemBarsBehavior(
+                    WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+            controller.hide(WindowInsetsCompat.Type.systemBars());
+        }
+        ViewCompat.setOnApplyWindowInsetsListener(mRoot, (v, insets) -> {
+            applySystemBarsMargins(visible ? insets : null);
+            return insets;
+        });
+        applySystemBarsMargins(visible ? ViewCompat.getRootWindowInsets(mRoot) : null);
+        ViewCompat.requestApplyInsets(mRoot);
+    }
+
+    /**
+     * @param insets the current window insets to clear, or {@code null} to reset margins to 0
+     *               (landscape full-screen, edge-to-edge).
+     */
+    private void applySystemBarsMargins(WindowInsetsCompat insets) {
+        int top = 0;
+        int bottom = 0;
+        if (insets != null) {
+            Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+            top = bars.top;
+            bottom = bars.bottom;
+        }
+        View video = mRoot.findViewById(R.id.playback_controls_fragment);
+        if (video != null && video.getLayoutParams() instanceof ViewGroup.MarginLayoutParams) {
+            ViewGroup.MarginLayoutParams lp = (ViewGroup.MarginLayoutParams) video.getLayoutParams();
+            if (lp.topMargin != top) {
+                lp.topMargin = top;
+                video.setLayoutParams(lp);
+            }
+        }
+        if (mShortsNavBar != null) {
+            if (mNavBarContentHeightPx < 0) {
+                mNavBarContentHeightPx = getResources().getDimensionPixelSize(R.dimen.mobile_bottom_nav_bar_height);
+            }
+            // Grow the bar's own height/background down into the nav bar inset (padding, not a
+            // bottomMargin gap) so its surface color fills that space instead of leaving a bare
+            // black strip below it - only the tab icons/labels get pushed up, via the padding,
+            // to stay clear of the system nav bar's touch area.
+            int targetHeight = mNavBarContentHeightPx + bottom;
+            ViewGroup.LayoutParams lp = mShortsNavBar.getLayoutParams();
+            if (lp.height != targetHeight) {
+                lp.height = targetHeight;
+                mShortsNavBar.setLayoutParams(lp);
+            }
+            mShortsNavBar.setPadding(mShortsNavBar.getPaddingLeft(), mShortsNavBar.getPaddingTop(),
+                    mShortsNavBar.getPaddingRight(), bottom);
+        }
+    }
+
+    /**
      * The panel views are siblings of this fragment in the activity layout and don't exist yet
      * while the fragment itself is being inflated — resolve them lazily.
      */
@@ -1413,6 +1592,15 @@ public class MobilePlaybackFragment extends PlaybackFragment {
             });
         }
 
+        // Fullscreen toggle: forces landscape (enter) or portrait (exit) via the activity's
+        // requestedOrientation. applyMobileLayout(), triggered by the resulting configuration
+        // change, then re-reads the actual orientation and re-applies the strip/full-screen
+        // layout and this button's icon — it never touches strip state directly.
+        mFullscreenBtn = activity.findViewById(R.id.mobile_fullscreen_btn);
+        if (mFullscreenBtn != null) {
+            mFullscreenBtn.setOnClickListener(v -> toggleFullscreen());
+        }
+
         // Centred play/pause indicator (ImageView — visual only, not tappable directly).
         mShortsPlayPauseBtn = activity.findViewById(R.id.mobile_shorts_play_pause_btn);
 
@@ -1423,26 +1611,10 @@ public class MobilePlaybackFragment extends PlaybackFragment {
             mShortsNavBar.bringToFront();
             mShortsNavBar.findViewById(R.id.shorts_nav_home).setOnClickListener(v ->
                     navigateToSection(MediaGroup.TYPE_HOME));
-            mShortsNavBar.findViewById(R.id.shorts_nav_shorts).setOnClickListener(v ->
-                    navigateToSection(MediaGroup.TYPE_SHORTS));
-            mShortsNavBar.findViewById(R.id.shorts_nav_subscriptions).setOnClickListener(v ->
-                    navigateToSection(MediaGroup.TYPE_SUBSCRIPTIONS));
-            mShortsNavBar.findViewById(R.id.shorts_nav_playlists).setOnClickListener(v -> {
-                if (mShortsPlaylistSheet != null
-                        && mShortsPlaylistSheet.getVisibility() == View.VISIBLE) {
-                    closeShortsPlaylistSheet();
-                } else {
-                    openShortsPlaylistSheet();
-                }
-            });
-            mShortsNavBar.findViewById(R.id.shorts_nav_you).setOnClickListener(v -> {
-                if (mShortsProfileSheet != null
-                        && mShortsProfileSheet.getVisibility() == View.VISIBLE) {
-                    closeShortsProfileSheet();
-                } else {
-                    openShortsProfileSheet();
-                }
-            });
+            mShortsNavBar.findViewById(R.id.shorts_nav_music).setOnClickListener(v ->
+                    navigateToSection(MediaGroup.TYPE_MUSIC));
+            mShortsNavBar.findViewById(R.id.shorts_nav_history).setOnClickListener(v ->
+                    navigateToSection(MediaGroup.TYPE_HISTORY));
         }
 
         // "You" profile sheet and scrim.

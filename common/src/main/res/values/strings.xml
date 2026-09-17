@@ -249,8 +249,6 @@
     <string name="share_embed_link">Share embed link</string>
     <string name="card_text_scroll_factor">Card text scroll speed</string>
     <string name="preferred_update_source">Select update source</string>
-    <string name="hide_shorts">Hide shorts from Subscriptions</string>
-    <string name="hide_shorts_channel">Hide shorts from a channel</string>
     <string name="key_remapping">Key remapping</string>
     <string name="screen_dimming">Screen dimming</string>
     <string name="removed_from_playback_queue">Removed from playback queue</string>
@@ -353,12 +351,8 @@
     <string name="player_seek_regular">Regular</string>
     <string name="player_seek_confirmation_pause">With confirmation (pause while seeking)</string>
     <string name="player_seek_confirmation_play">With confirmation (play while seeking)</string>
-    <string name="hide_shorts_from_home">Hide shorts from Home</string>
     <string name="finish_on_disconnect">Close the app after disconnecting the phone/tablet</string>
     <string name="update_error">Update error</string>
-    <string name="hide_shorts_from_search">Hide shorts from the search result</string>
-    <string name="hide_shorts_from_history">Hide shorts from History</string>
-    <string name="hide_shorts_from_trending">Hide shorts from Trending</string>
     <string name="disable_screensaver">Disable screensaver</string>
     <string name="description_not_found">Description not found</string>
     <string name="proxy_port_hint">Proxy port</string>
@@ -587,7 +581,6 @@
     <string name="audio_language">Audio language</string>
     <string name="old_home_look">Old look of the Home section</string>
     <string name="old_channel_look">Old look of the Channel page</string>
-    <string name="hide_shorts_everywhere">Hide shorts everywhere</string>
     <string name="update_found">Update</string>
     <string name="volume_boost_warning">Any settings over the limit can potentially damage speakers</string>
     <string name="play_video_incognito">Play incognito</string>

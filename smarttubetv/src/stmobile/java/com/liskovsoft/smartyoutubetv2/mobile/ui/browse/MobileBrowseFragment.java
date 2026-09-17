@@ -28,6 +28,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.bumptech.glide.Glide;
+import com.liskovsoft.mediaserviceinterfaces.data.MediaGroup;
 import com.liskovsoft.mediaserviceinterfaces.oauth.Account;
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.BrowseSection;
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.SettingsGroup;
@@ -70,6 +71,9 @@ public class MobileBrowseFragment extends Fragment implements BrowseView, MediaS
     private Button mEmptyButton;
     private TextView mToolbarTitle;
     private ImageView mAccountView;
+    private View mBottomNavHome;
+    private View mBottomNavMusic;
+    private View mBottomNavHistory;
     private SectionAdapter mSectionAdapter;
     private VideoCardAdapter mGridAdapter;
     private ShelfAdapter mShelfAdapter;
@@ -131,6 +135,14 @@ public class MobileBrowseFragment extends Fragment implements BrowseView, MediaS
             startActivity(new Intent(getContext(), MobileAboutActivity.class));
         });
 
+        // Bottom navigation bar: Home / Music / History jump straight to that section.
+        mBottomNavHome = view.findViewById(R.id.bottom_nav_home);
+        mBottomNavMusic = view.findViewById(R.id.bottom_nav_music);
+        mBottomNavHistory = view.findViewById(R.id.bottom_nav_history);
+        mBottomNavHome.setOnClickListener(v -> navigateToSection(MediaGroup.TYPE_HOME));
+        mBottomNavMusic.setOnClickListener(v -> navigateToSection(MediaGroup.TYPE_MUSIC));
+        mBottomNavHistory.setOnClickListener(v -> navigateToSection(MediaGroup.TYPE_HISTORY));
+
         int screenWidth = getResources().getDisplayMetrics().widthPixels;
         mGridSpan = getResources().getInteger(R.integer.mobile_grid_span);
         mGridCardWidth = screenWidth / mGridSpan;
@@ -167,6 +179,16 @@ public class MobileBrowseFragment extends Fragment implements BrowseView, MediaS
             mDrawer.closeDrawer(GravityCompat.START);
         }
         selectSection(mSectionAdapter.indexOf(section), true);
+    }
+
+    /** Bottom nav bar Home/Music/History taps: jump to that section by MediaGroup id. */
+    private void navigateToSection(int sectionId) {
+        if (mDrawer != null) {
+            mDrawer.closeDrawer(GravityCompat.START);
+        }
+        if (mSectionAdapter != null) {
+            selectSection(mSectionAdapter.indexOfSection(sectionId), true);
+        }
     }
 
     @Override
@@ -279,9 +301,23 @@ public class MobileBrowseFragment extends Fragment implements BrowseView, MediaS
         if (mToolbarTitle != null) {
             mToolbarTitle.setText(section.getTitle());
         }
+        updateBottomNavSelection(section.getId());
         setupContentForType(section.getType());
         if (mPresenter != null) {
             mPresenter.onSectionFocused(section.getId());
+        }
+    }
+
+    /** Highlights the bottom nav bar tab matching the now-selected section, if any. */
+    private void updateBottomNavSelection(int sectionId) {
+        setBottomNavSelected(mBottomNavHome, sectionId == MediaGroup.TYPE_HOME);
+        setBottomNavSelected(mBottomNavMusic, sectionId == MediaGroup.TYPE_MUSIC);
+        setBottomNavSelected(mBottomNavHistory, sectionId == MediaGroup.TYPE_HISTORY);
+    }
+
+    private void setBottomNavSelected(View tab, boolean selected) {
+        if (tab != null) {
+            tab.setSelected(selected);
         }
     }
 

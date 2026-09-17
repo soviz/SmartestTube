@@ -32,4 +32,22 @@
         <item name="android:windowIsTranslucent">true</item>
         <item name="android:windowBackground">@android:color/transparent</item>
     </style>
+
+    <!-- Phone player host. Same Leanback player attributes as the TV theme (shelf/card colors,
+         playback styles - PlaybackActivity/PlaybackFragment read those), but WITHOUT the TV
+         theme's static "always fullscreen" flags: on a phone the system status/navigation bars
+         should stay visible outside of landscape full-screen playback. Runtime show/hide is
+         handled entirely by MobilePlaybackFragment.applySystemBarsVisibility() (via
+         SystemBarsHelper, which toggles View#setFitsSystemWindows() on mobile_playback_root at
+         runtime) - deliberately NOT setting android:fitsSystemWindows here, since a static theme
+         value for it fights that same runtime call. windowFullscreen/windowTranslucentNavigation/
+         windowOverscan are still overridden: those are separate legacy flags (full-screen intent
+         and translucent-bars-as-overlay, respectively) that stayed statically "on" from the TV
+         parent theme and were forcing the bars to draw over the content regardless of what the
+         runtime insets calls did. -->
+    <style name="Theme.SmarterTube.Mobile.Player" parent="App.Theme.Leanback.Player">
+        <item name="android:windowFullscreen">false</item>
+        <item name="android:windowTranslucentNavigation">false</item>
+        <item name="android:windowOverscan">false</item>
+    </style>
 </resources>

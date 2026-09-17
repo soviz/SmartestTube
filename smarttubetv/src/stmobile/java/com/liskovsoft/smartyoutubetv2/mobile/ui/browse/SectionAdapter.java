@@ -74,8 +74,13 @@ class SectionAdapter extends RecyclerView.Adapter<SectionAdapter.ViewHolder> {
         if (section == null) {
             return -1;
         }
+        return indexOfSection(section.getId());
+    }
+
+    /** Looks up a section's position by its {@code MediaGroup} id (e.g. for the bottom nav bar). */
+    int indexOfSection(int sectionId) {
         for (int i = 0; i < mSections.size(); i++) {
-            if (mSections.get(i).getId() == section.getId()) {
+            if (mSections.get(i).getId() == sectionId) {
                 return i;
             }
         }

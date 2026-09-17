@@ -150,15 +150,6 @@ flavor's own dependency block (as already done for
 `SharedModules/constants.gradle`, unless the constant is already defined
 there and can be reused without modification.
 
-## Test Before Shipping
-
-Whenever new or changed Java logic is non-trivial — parsing/serialization,
-pagination logic, background sync/update-check logic, state machines,
-anything with real branching — add or update a JUnit/Robolectric test in
-the relevant module's `src/test` in the same change. A clean compile is not
-evidence that new logic is correct. Skip this for trivial getters/setters
-or straightforward UI composition with no branching.
-
 ## Bumping the App Version Before a Release
 
 `versionCode` must increase on every release build (`smarttubetv/build.gradle`'s

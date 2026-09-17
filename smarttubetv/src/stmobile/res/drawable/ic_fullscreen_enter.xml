@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- "Enter fullscreen" - diagonal arrows pointing outward, matching the system PiP expand glyph. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="40dp"
+    android:height="40dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M4,10h2V6h4L10,4L4,4v6zM4,20h6v-2L6,18v-4L4,14v6zM14,4v2h4v4h2L20,4h-6zM18,18h-4v2h6v-6h-2v4z"/>
+</vector>

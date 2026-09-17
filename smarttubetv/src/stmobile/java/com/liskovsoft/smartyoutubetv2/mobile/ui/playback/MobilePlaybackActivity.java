@@ -77,6 +77,29 @@ public class MobilePlaybackActivity extends PlaybackActivity {
     }
 
     /**
+     * Swipe-down-to-minimize (issue: "windowed mode like the official YouTube app"): leaves the
+     * player screen while keeping the engine alive and playback running, so the user is free to
+     * navigate the rest of the app underneath.
+     *
+     * There's no safe way to keep this Activity's ExoPlayer instance alive while genuinely handing
+     * the foreground to another Activity in the same task other than the platform's own mechanism
+     * for that: real Android Picture-in-Picture. blockEngine(true) is what stops the shared
+     * {@link PlaybackFragment}'s onStop() from releasing the player (see maybeReleasePlayer()); the
+     * inherited {@link PlaybackActivity#finish()} (called as {@code finish()}, not
+     * {@code super.finish()}, so the override below actually runs) then sees isEngineBlocked() via
+     * doNotDestroy()/wannaEnterToPip() and pins this activity into a small floating PIP window
+     * instead of destroying it - the video keeps playing in that window while Home (already
+     * sitting under this activity in the shared phone task) becomes free to use normally,
+     * including navigating between its own screens.
+     */
+    public void enterWindowedMode() {
+        if (mMobileFragment != null) {
+            mMobileFragment.blockEngine(true);
+        }
+        finish();
+    }
+
+    /**
      * PIP fix (#33): don't relaunch Home when the player drops into PIP.
      *
      * The shared base launches the parent activity here. On the phone, Home
