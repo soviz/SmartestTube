@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug-only launcher icon background override, kept in sync with brand_accent purple. -->
+<resources>
+    <color name="ic_launcher_background">#2A0F33</color>
+</resources>

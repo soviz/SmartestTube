@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Debug-only accent override (purple) so a dev build is visually distinct
+    from the release build when installed side by side. Light-mode tokens;
+    see values-night/colors.xml for the dark-mode counterpart.
+-->
+<resources>
+    <color name="brand_accent">#8E24AA</color>
+    <color name="brand_accent_on">#FFFFFFFF</color>
+</resources>

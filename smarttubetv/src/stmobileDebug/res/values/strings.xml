@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Debug-only override so a dev build installed alongside the release build is
+         instantly recognizable by name on the launcher/recents. -->
+    <string name="app_name" translatable="false">SmartestTube</string>
+</resources>

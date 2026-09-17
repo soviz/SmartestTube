@@ -1,0 +1,19 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Run debug build on device",
+            "type": "node-terminal",
+            "request": "launch",
+            "command": "${workspaceFolder}/scripts/run-debug.sh",
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "name": "Watch crashes (app already running)",
+            "type": "node-terminal",
+            "request": "launch",
+            "command": "${workspaceFolder}/scripts/watch-crashes.sh",
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug-only accent override (purple), dark-mode counterpart of values/colors.xml. -->
+<resources>
+    <color name="brand_accent">#8E24AA</color>
+    <color name="brand_accent_on">#FFFFFFFF</color>
+</resources>

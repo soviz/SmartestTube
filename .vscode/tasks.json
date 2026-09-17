@@ -1,0 +1,55 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Run debug build on device",
+            "type": "shell",
+            "command": "${workspaceFolder}/scripts/run-debug.sh",
+            "isBackground": true,
+            "problemMatcher": {
+                "pattern": {
+                    "regexp": "^.*$",
+                    "file": 1,
+                    "line": 1
+                },
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": "^== Building stmobile debug ==$",
+                    "endsPattern": "^== Streaming logcat.*=="
+                }
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "clear": true
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "Watch crashes (app already running)",
+            "type": "shell",
+            "command": "${workspaceFolder}/scripts/watch-crashes.sh",
+            "isBackground": true,
+            "problemMatcher": {
+                "pattern": {
+                    "regexp": "^.*$",
+                    "file": 1,
+                    "line": 1
+                },
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": "^== Streaming logcat.*==$",
+                    "endsPattern": "^== Streaming logcat.*=="
+                }
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "clear": true
+            }
+        }
+    ]
+}

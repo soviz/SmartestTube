@@ -120,6 +120,10 @@ android {
             if (keystorePropertiesFile.exists()) {
                 signingConfig signingConfigs.release
             }
+
+            // Distinct applicationId so a debug install lands as its own app next to
+            // a release install of the same flavor, instead of overwriting it.
+            applicationIdSuffix ".debug"
         }
     }
 
