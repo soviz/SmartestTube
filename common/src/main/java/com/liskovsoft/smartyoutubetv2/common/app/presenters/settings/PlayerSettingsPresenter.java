@@ -204,6 +204,7 @@ public class PlayerSettingsPresenter extends BasePresenter<Void> {
         for (int[] pair : new int[][] {
                 {R.string.auto_frame_rate, PlayerTweaksData.PLAYER_BUTTON_AFR},
                 {R.string.action_sound_off, PlayerTweaksData.PLAYER_BUTTON_SOUND_OFF},
+                {R.string.action_video_off, PlayerTweaksData.PLAYER_BUTTON_VIDEO_OFF},
                 {R.string.video_rotate, PlayerTweaksData.PLAYER_BUTTON_VIDEO_ROTATE},
                 {R.string.video_flip, PlayerTweaksData.PLAYER_BUTTON_VIDEO_FLIP},
                 {R.string.open_chat, PlayerTweaksData.PLAYER_BUTTON_CHAT},

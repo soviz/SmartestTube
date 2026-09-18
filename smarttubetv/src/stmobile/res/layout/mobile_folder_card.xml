@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Card root width and thumbnail (frame) height are set in code (FolderCardAdapter). -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="4dp"
+    android:clickable="true"
+    android:focusable="true"
+    android:background="?android:attr/selectableItemBackground">
+
+    <!-- Frame wraps the cover thumbnail (the folder's first video) so the video-count
+         badge can overlay its bottom-right, YouTube-playlist-style. Height is set in
+         code (width * 9 / 16). -->
+    <FrameLayout
+        android:id="@+id/folder_thumb_frame"
+        android:layout_width="match_parent"
+        android:layout_height="1dp">
+
+        <ImageView
+            android:id="@+id/folder_thumb"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop"
+            android:background="@color/mobile_thumbnail_placeholder"
+            android:contentDescription="@null" />
+
+        <TextView
+            android:id="@+id/folder_count"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|end"
+            android:layout_margin="4dp"
+            android:background="@drawable/mobile_badge_bg"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp"
+            android:paddingTop="1dp"
+            android:paddingBottom="1dp"
+            android:textColor="#FFFFFFFF"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+    </FrameLayout>
+
+    <TextView
+        android:id="@+id/folder_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:maxLines="2"
+        android:ellipsize="end"
+        android:textColor="@color/mobile_text_primary"
+        android:textSize="13sp" />
+</LinearLayout>

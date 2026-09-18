@@ -56,6 +56,7 @@ public class PlayerUIController extends BasePlayerController {
     private SuggestionsController mSuggestionsController;
     private List<PlaylistInfo> mPlaylistInfos;
     private FormatItem mAudioFormat = FormatItem.AUDIO_HQ_MP4A;
+    private FormatItem mVideoFormat;
     private boolean mEngineReady;
     private boolean mDebugViewEnabled;
     private boolean mIsMetadataLoaded;
@@ -299,6 +300,7 @@ public class PlayerUIController extends BasePlayerController {
 
         getPlayer().updateEndingTime();
         applySoundOffButtonState();
+        applyVideoOffButtonState();
     }
 
     @Override
@@ -326,6 +328,7 @@ public class PlayerUIController extends BasePlayerController {
         // Maybe dialog just closed. Reset timeout just in case.
         enableUiAutoHideTimeout();
         applySoundOffButtonState();
+        applyVideoOffButtonState();
     }
 
     @Override
@@ -352,6 +355,7 @@ public class PlayerUIController extends BasePlayerController {
         getPlayer().setButtonState(R.id.action_video_speed, PlayerUI.BUTTON_OFF);
         getPlayer().setButtonState(R.id.action_chat, PlayerUI.BUTTON_OFF);
         getPlayer().setButtonState(R.id.action_subscribe, PlayerUI.BUTTON_OFF);
+        getPlayer().setButtonState(R.id.action_video_off, PlayerUI.BUTTON_OFF);
     }
 
     @Override
@@ -590,6 +594,8 @@ public class PlayerUIController extends BasePlayerController {
             onSubscribe(buttonState);
         } else if (buttonId == R.id.action_sound_off) {
             applySoundOff(buttonState);
+        } else if (buttonId == R.id.action_video_off) {
+            applyVideoOff(buttonState);
         } else if (buttonId == R.id.action_afr) {
             applyAfr(buttonState);
         } else if (buttonId == R.id.action_repeat) {
@@ -1039,6 +1045,32 @@ public class PlayerUIController extends BasePlayerController {
         if (getPlayer() != null && getPlayer().getAudioFormat() != null) {
             getPlayer().setButtonState(R.id.action_sound_off,
                     (getPlayer().getAudioFormat().isDefault() || getPlayerData().getPlayerVolume() == 0) ? PlayerUI.BUTTON_ON : PlayerUI.BUTTON_OFF);
+        }
+    }
+
+    // Per-video toggle only - doesn't touch PlayerData, unlike the global quality preset
+    private void applyVideoOff(int buttonState) {
+        if (getPlayer() == null) {
+            return;
+        }
+
+        if (buttonState == PlayerUI.BUTTON_OFF) {
+            FormatItem currentFormat = getPlayer().getVideoFormat();
+            if (!Helpers.equals(currentFormat, FormatItem.NO_VIDEO)) {
+                mVideoFormat = currentFormat;
+            }
+            getPlayer().setFormat(FormatItem.NO_VIDEO);
+        } else {
+            getPlayer().setFormat(Helpers.firstNonNull(mVideoFormat, getPlayerData().getFormat(FormatItem.TYPE_VIDEO)));
+        }
+
+        getPlayer().setButtonState(R.id.action_video_off, buttonState == PlayerUI.BUTTON_OFF ? PlayerUI.BUTTON_ON : PlayerUI.BUTTON_OFF);
+    }
+
+    private void applyVideoOffButtonState() {
+        if (getPlayer() != null && getPlayer().getVideoFormat() != null) {
+            getPlayer().setButtonState(R.id.action_video_off,
+                    Helpers.equals(getPlayer().getVideoFormat(), FormatItem.NO_VIDEO) ? PlayerUI.BUTTON_ON : PlayerUI.BUTTON_OFF);
         }
     }
 

@@ -197,13 +197,11 @@
         </RelativeLayout>
 
         <!-- Phone: secondary controls (CC/HQ/chat) below the transport row, above the seek bar.
-             Row height is pinned to lb_control_button_height (the same dimen the buttons inside
-             it use) purely so its on-screen vertical center is a known, fixed distance above the
-             seek bar - the fullscreen toggle overlay (mobile_fullscreen_btn, a plain sibling view
-             in fragment_playback.xml, kept there because MobilePlaybackFragment resolves it via a
-             simple activity.findViewById() before this dynamically-inflated row ever exists) uses
-             that same math for its own marginBottom so it lines up with this row instead of
-             floating separately over the video. -->
+             The fullscreen toggle (mobile_fullscreen_btn) lives in this same row, end-aligned,
+             so it's one container with the other buttons instead of a separately positioned
+             overlay that has to be nudged back into place whenever this row's layout changes.
+             MobilePlaybackFragment still resolves it via activity.findViewById() - id/class
+             unchanged, only its position in the tree moved. -->
         <RelativeLayout
             android:layout_width="match_parent"
             android:layout_height="@dimen/lb_control_button_height"
@@ -218,6 +216,18 @@
                 android:layout_alignParentStart="true"
                 android:layout_centerVertical="true" >
             </FrameLayout>
+
+            <ImageButton
+                android:id="@+id/mobile_fullscreen_btn"
+                android:layout_width="@dimen/lb_control_button_height"
+                android:layout_height="@dimen/lb_control_button_height"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:src="@drawable/ic_fullscreen_enter"
+                android:background="@android:color/transparent"
+                android:scaleType="center"
+                android:visibility="visible"
+                android:contentDescription="@string/mobile_fullscreen_toggle" />
         </RelativeLayout>
 
         <!-- Phone: seek bar last — hugs the bottom edge of the video, YouTube-style. -->

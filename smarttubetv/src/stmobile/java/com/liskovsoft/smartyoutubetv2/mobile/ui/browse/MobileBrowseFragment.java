@@ -77,6 +77,7 @@ public class MobileBrowseFragment extends Fragment implements BrowseView, MediaS
     private SectionAdapter mSectionAdapter;
     private VideoCardAdapter mGridAdapter;
     private ShelfAdapter mShelfAdapter;
+    private FolderCardAdapter mFolderAdapter;
     private SettingsItemAdapter mSettingsAdapter;
     private boolean mProgressShowing;
     private boolean mSwipeRefreshing;
@@ -302,7 +303,7 @@ public class MobileBrowseFragment extends Fragment implements BrowseView, MediaS
             mToolbarTitle.setText(section.getTitle());
         }
         updateBottomNavSelection(section.getId());
-        setupContentForType(section.getType());
+        setupContentForType(section);
         if (mPresenter != null) {
             mPresenter.onSectionFocused(section.getId());
         }
@@ -330,6 +331,7 @@ public class MobileBrowseFragment extends Fragment implements BrowseView, MediaS
             case VideoGroup.ACTION_REPLACE:
                 if (mShelfAdapter != null) mShelfAdapter.clear();
                 if (mGridAdapter != null) mGridAdapter.clear();
+                if (mFolderAdapter != null) mFolderAdapter.clear();
                 hideEmptyMessage();
                 break;
             case VideoGroup.ACTION_REMOVE:
@@ -345,7 +347,11 @@ public class MobileBrowseFragment extends Fragment implements BrowseView, MediaS
                     break;
                 }
                 hideEmptyMessage();
-                if (mShelfAdapter != null) {
+                if (mFolderAdapter != null) {
+                    // One folder card per group (Music): don't unpack its videos into the
+                    // grid, just add/refresh the card.
+                    mFolderAdapter.appendGroup(group);
+                } else if (mShelfAdapter != null) {
                     mShelfAdapter.appendGroup(group);
                 } else if (mGridAdapter != null) {
                     // A continuation carries the full cumulative list, so replace.
@@ -363,6 +369,7 @@ public class MobileBrowseFragment extends Fragment implements BrowseView, MediaS
         hideEmptyMessage();
         mShelfAdapter = null;
         mGridAdapter = null;
+        mFolderAdapter = null;
         mSettingsAdapter = new SettingsItemAdapter(prependThemeRow(group.getItems()));
         mContentList.setLayoutManager(new LinearLayoutManager(getContext()));
         mContentList.setAdapter(mSettingsAdapter);
@@ -473,6 +480,7 @@ public class MobileBrowseFragment extends Fragment implements BrowseView, MediaS
     public void clearSection(BrowseSection section) {
         if (mShelfAdapter != null) mShelfAdapter.clear();
         if (mGridAdapter != null) mGridAdapter.clear();
+        if (mFolderAdapter != null) mFolderAdapter.clear();
     }
 
     @Override
@@ -535,6 +543,7 @@ public class MobileBrowseFragment extends Fragment implements BrowseView, MediaS
     public boolean isEmpty() {
         return (mGridAdapter == null || mGridAdapter.getItemCount() == 0)
                 && (mShelfAdapter == null || mShelfAdapter.getItemCount() == 0)
+                && (mFolderAdapter == null || mFolderAdapter.getItemCount() == 0)
                 && (mSettingsAdapter == null || mSettingsAdapter.getItemCount() == 0);
     }
 
@@ -546,12 +555,22 @@ public class MobileBrowseFragment extends Fragment implements BrowseView, MediaS
 
     // ----- helpers -----
 
-    private void setupContentForType(int type) {
+    private void setupContentForType(BrowseSection section) {
         hideEmptyMessage();
         mContentList.clearOnScrollListeners();
-        if (type == BrowseSection.TYPE_ROW) {
+        int type = section.getType();
+        if (type == BrowseSection.TYPE_ROW && section.getId() == MediaGroup.TYPE_MUSIC) {
+            // Music: folders (one cover card per row) instead of horizontal shelves.
+            mFolderAdapter = new FolderCardAdapter(mGridCardWidth, mFolderClick);
+            mShelfAdapter = null;
+            mGridAdapter = null;
+            mSettingsAdapter = null;
+            mContentList.setLayoutManager(new GridLayoutManager(getContext(), mGridSpan));
+            mContentList.setAdapter(mFolderAdapter);
+        } else if (type == BrowseSection.TYPE_ROW) {
             mShelfAdapter = new ShelfAdapter(mShelfCardWidth, mVideoClick, mVideoLongClick,
                     mShelfScrollEnd);
+            mFolderAdapter = null;
             mGridAdapter = null;
             mSettingsAdapter = null;
             mContentList.setLayoutManager(new LinearLayoutManager(getContext()));
@@ -560,9 +579,11 @@ public class MobileBrowseFragment extends Fragment implements BrowseView, MediaS
             // The adapter is supplied separately via updateSection(SettingsGroup).
             mShelfAdapter = null;
             mGridAdapter = null;
+            mFolderAdapter = null;
         } else {
             mGridAdapter = new VideoCardAdapter(mGridCardWidth, mVideoClick, mVideoLongClick);
             mShelfAdapter = null;
+            mFolderAdapter = null;
             mSettingsAdapter = null;
             mContentList.setLayoutManager(new GridLayoutManager(getContext(), mGridSpan));
             mContentList.setAdapter(mGridAdapter);
@@ -583,6 +604,9 @@ public class MobileBrowseFragment extends Fragment implements BrowseView, MediaS
         }
         if (mGridAdapter != null) {
             mGridAdapter.setCardWidth(mGridCardWidth);
+        }
+        if (mFolderAdapter != null) {
+            mFolderAdapter.setCardWidth(mGridCardWidth);
         }
     }
 
@@ -607,6 +631,14 @@ public class MobileBrowseFragment extends Fragment implements BrowseView, MediaS
         if (mPresenter != null) {
             mPresenter.onVideoItemLongClicked(video);
         }
+    };
+
+    private final FolderCardAdapter.OnFolderAction mFolderClick = group -> {
+        if (getContext() == null) {
+            return;
+        }
+        MusicFolderStore.setPendingGroup(group);
+        startActivity(new Intent(getContext(), MobileMusicFolderActivity.class));
     };
 
     private final ShelfAdapter.OnShelfScrollEnd mShelfScrollEnd = last -> {

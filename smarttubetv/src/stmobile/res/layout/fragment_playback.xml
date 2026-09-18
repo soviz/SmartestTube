@@ -93,26 +93,10 @@
         android:layout_marginTop="4dp" />
 
     <!--
-        Fullscreen toggle: bottom-right of the video, sized and vertically aligned to sit near the
-        Leanback CC/HQ/chat row (lb_playback_transport_controls_row.xml's secondary_controls_row)
-        rather than the video's own corner. It stays a plain sibling view here (not inside that
-        dynamically-inflated Leanback row) because MobilePlaybackFragment resolves it via a simple
-        activity.findViewById() before the row is ever bound. marginBottom nudged back down
-        (52dp, was 60dp) per feedback that it had gone slightly too high.
+        (mobile_fullscreen_btn now lives inside lb_playback_transport_controls_row.xml, in the
+        same secondary-controls row as CC/HQ/chat, so it no longer needs a separately positioned
+        overlay here - see that file for details.)
     -->
-    <ImageButton
-        android:id="@+id/mobile_fullscreen_btn"
-        android:layout_width="@dimen/lb_control_button_height"
-        android:layout_height="@dimen/lb_control_button_height"
-        android:src="@drawable/ic_fullscreen_enter"
-        android:background="@android:color/transparent"
-        android:scaleType="center"
-        android:visibility="visible"
-        android:contentDescription="@string/mobile_fullscreen_toggle"
-        app:layout_constraintEnd_toEndOf="@id/playback_controls_fragment"
-        app:layout_constraintBottom_toBottomOf="@id/playback_controls_fragment"
-        android:layout_marginEnd="8dp"
-        android:layout_marginBottom="52dp" />
 
     <!--
         Shorts overlay: centred play/pause indicator (not interactive — tap-anywhere logic in

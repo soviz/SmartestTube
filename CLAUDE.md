@@ -150,6 +150,22 @@ flavor's own dependency block (as already done for
 `SharedModules/constants.gradle`, unless the constant is already defined
 there and can be reused without modification.
 
+## "Prod Build" Means Local Install, Not a Store Release
+
+When the user asks to "собрать прод билд" / "собрать продакшен сборку" and
+install it on a device, this means: build the release build type
+(`assembleStmobileRelease` or equivalent — release buildType, no debug
+code/dev processes, matches the device's ABI) and sideload it via
+`adb install -r` for local testing. It does NOT mean preparing/uploading a
+GitHub Release or F-Droid submission, and does NOT require the real
+release-signing keystore.
+
+If no real release keystore is configured (`keystore.properties` /
+`smartertube-release.jks` missing), generate a throwaway local keystore for
+this purpose only, so `adb install` accepts the APK. Never use this
+throwaway keystore for an actual GitHub Releases / F-Droid build — those
+still require the real release-signing identity.
+
 ## Bumping the App Version Before a Release
 
 `versionCode` must increase on every release build (`smarttubetv/build.gradle`'s

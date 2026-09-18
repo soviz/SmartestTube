@@ -133,6 +133,16 @@
             android:screenOrientation="portrait"
             android:theme="@style/Theme.SmarterTube.Mobile" />
 
+        <!-- Native phone Music folder-details screen. singleTop so re-tapping a folder
+             from the Music grid reuses the existing instance. -->
+        <activity
+            android:name="com.liskovsoft.smartyoutubetv2.mobile.ui.browse.MobileMusicFolderActivity"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|layoutDirection|keyboardHidden"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.SmarterTube.Mobile" />
+
         <!-- Native phone Channel screen (Phase 5). singleTop so revisiting a channel from
              a video card reuses the existing instance rather than stacking duplicates. -->
         <activity

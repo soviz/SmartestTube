@@ -812,6 +812,20 @@ public class MobilePlaybackFragment extends PlaybackFragment {
         // Non-Shorts: ensure the control row is visible after the lazy inflate. In Shorts the
         // control row (transport buttons + seek bar + time) is owned by setShortsChrome.
         if (mLayoutState != 2) setShortsControlsVisible(true);
+        // mobile_fullscreen_btn now lives inside the Leanback secondary-controls row
+        // (lb_playback_transport_controls_row.xml), which is itself lazily inflated on first
+        // reveal — initPanelViews()'s one-shot lookup can run before that row exists, so
+        // re-resolve it here (after the lazy inflate) if it's still unbound.
+        if (mFullscreenBtn == null) {
+            Activity activity = getActivity();
+            if (activity != null) {
+                mFullscreenBtn = activity.findViewById(R.id.mobile_fullscreen_btn);
+                if (mFullscreenBtn != null) {
+                    mFullscreenBtn.setOnClickListener(v -> toggleFullscreen());
+                    mFullscreenBtn.setImageResource(mStripMode ? R.drawable.ic_fullscreen_enter : R.drawable.ic_fullscreen_exit);
+                }
+            }
+        }
         // Back button and fullscreen toggle follow the player controls on all non-Shorts pages.
         if (mShortsBackBtn != null && mLayoutState != 2) mShortsBackBtn.setVisibility(View.VISIBLE);
         if (mFullscreenBtn != null && mLayoutState != 2) mFullscreenBtn.setVisibility(View.VISIBLE);

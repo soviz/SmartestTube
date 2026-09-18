@@ -21,10 +21,14 @@ import com.liskovsoft.smartyoutubetv2.common.app.models.playback.manager.PlayerC
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.AppDialogPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.dialogs.VideoActionPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.views.PlaybackView;
+import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.FormatItem;
+import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.track.MediaTrack;
 import com.liskovsoft.smartyoutubetv2.common.misc.MediaServiceManager;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerData;
 import com.liskovsoft.smartyoutubetv2.common.utils.Utils;
 import com.liskovsoft.youtubeapi.service.YouTubeServiceManager;
+
+import java.util.List;
 
 import io.reactivex.disposables.Disposable;
 
@@ -114,10 +118,49 @@ public class VideoLoaderController extends BasePlayerController {
         if (getPlayer() == null) {
             return;
         }
-        
+
         getPlayer().setButtonState(R.id.action_repeat, video.finishOnEnded ? PlayerConstants.PLAYBACK_MODE_CLOSE : getPlayerData().getPlaybackMode());
         // Can't set title at this point
         //checkSleepTimer();
+
+        applyMusicAudioOnlyMode(video);
+    }
+
+    // Music tab items: force video off and use the highest audio bitrate, independent of the user's regular quality presets
+    private void applyMusicAudioOnlyMode(Video video) {
+        if (video.belongsToMusic()) {
+            getPlayer().setFormat(FormatItem.NO_VIDEO);
+            getPlayer().setFormat(getHighestBitrateAudioFormat());
+        } else {
+            getPlayer().setFormat(getPlayerData().getFormat(FormatItem.TYPE_VIDEO));
+            getPlayer().setFormat(getPlayerData().getFormat(FormatItem.TYPE_AUDIO));
+        }
+    }
+
+    private FormatItem getHighestBitrateAudioFormat() {
+        List<FormatItem> audioFormats = getPlayer().getAudioFormats();
+
+        if (audioFormats == null) {
+            return null;
+        }
+
+        FormatItem result = null;
+        int maxBitrate = -1;
+
+        for (FormatItem formatItem : audioFormats) {
+            MediaTrack track = formatItem.getTrack();
+
+            if (track == null || track.format == null) {
+                continue;
+            }
+
+            if (track.format.bitrate > maxBitrate) {
+                maxBitrate = track.format.bitrate;
+                result = formatItem;
+            }
+        }
+
+        return result;
     }
 
     @Override

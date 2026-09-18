@@ -17,6 +17,7 @@ import com.liskovsoft.smartyoutubetv2.common.app.models.playback.manager.PlayerC
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerTweaksData;
 import com.liskovsoft.smartyoutubetv2.mobile.ui.browse.MobileBrowseActivity;
+import com.liskovsoft.smartyoutubetv2.mobile.ui.browse.MobileMusicFolderActivity;
 import com.liskovsoft.smartyoutubetv2.mobile.ui.channel.MobileChannelActivity;
 import com.liskovsoft.smartyoutubetv2.mobile.ui.channeluploads.MobileChannelUploadsActivity;
 import com.liskovsoft.smartyoutubetv2.mobile.ui.dialogs.MobileAppDialogActivity;
@@ -103,5 +104,10 @@ public class MobileApplication extends MainApplication {
         viewManager.register(ChannelView.class, MobileChannelActivity.class, MobileBrowseActivity.class);
         viewManager.register(ChannelUploadsView.class, MobileChannelUploadsActivity.class, MobileBrowseActivity.class);
         viewManager.register(WebBrowserView.class, WebBrowserActivity.class, MobileBrowseActivity.class);
+        // No presenter/View interface backs this screen (it's a plain in-memory hand-off
+        // via MusicFolderStore, started with a direct startActivity), so the activity
+        // class itself doubles as the view-key - only the parent mapping is needed, to
+        // keep it correctly anchored to Home in the ViewManager back-stack.
+        viewManager.register(MobileMusicFolderActivity.class, MobileMusicFolderActivity.class, MobileBrowseActivity.class);
     }
 }
