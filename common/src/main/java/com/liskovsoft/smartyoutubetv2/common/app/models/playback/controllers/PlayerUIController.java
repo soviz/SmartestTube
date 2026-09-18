@@ -300,6 +300,13 @@ public class PlayerUIController extends BasePlayerController {
 
         getPlayer().updateEndingTime();
         applySoundOffButtonState();
+        // A new video always starts from the global default (VideoLoaderController just applied
+        // it) - forget any per-video "video on" override saved for the PREVIOUS video, so a
+        // manual toggle on this one doesn't restore a stale resolution left over from it. Same
+        // for the temp format parked in PlayerData by applyVideoOff()'s ON branch - otherwise
+        // restoreVideoFormat() on the NEXT video would pick up this video's leftover override.
+        mVideoFormat = null;
+        getPlayerData().setTempVideoFormat(null);
         applyVideoOffButtonState();
     }
 
@@ -1060,8 +1067,36 @@ public class PlayerUIController extends BasePlayerController {
                 mVideoFormat = currentFormat;
             }
             getPlayer().setFormat(FormatItem.NO_VIDEO);
+            // Clear any "video on" override left from a previous toggle on THIS video, so the
+            // restoreVideoFormat() path (see the ON branch below) falls back to the persisted
+            // global default again, not a stale temp value.
+            getPlayerData().setTempVideoFormat(null);
         } else {
-            getPlayer().setFormat(Helpers.firstNonNull(mVideoFormat, getPlayerData().getFormat(FormatItem.TYPE_VIDEO)));
+            // This is the per-video override the button name promises: turning video back ON
+            // here must win over the user's saved global default even when that default is
+            // itself NO_VIDEO (the "video off by default" toggle) - falling back to
+            // getPlayerData().getFormat(TYPE_VIDEO) would just re-apply NO_VIDEO in that case,
+            // so the button would appear to turn video on (cover hidden) while actually leaving
+            // it off (black screen, no frames decoded). Fall back to VIDEO_AUTO instead, which
+            // is never itself NO_VIDEO.
+            FormatItem restoreFormat = mVideoFormat;
+            if (restoreFormat == null || Helpers.equals(restoreFormat, FormatItem.NO_VIDEO)) {
+                FormatItem defaultFormat = getPlayerData().getFormat(FormatItem.TYPE_VIDEO);
+                restoreFormat = Helpers.equals(defaultFormat, FormatItem.NO_VIDEO) ? FormatItem.VIDEO_AUTO : defaultFormat;
+            }
+            getPlayer().setFormat(restoreFormat);
+            // Root cause of the black screen (found via diagnostic logging): setFormat() here
+            // was correct and DID apply VIDEO_AUTO, but VideoStateController.onSourceChanged()
+            // -> restoreFormats() -> restoreVideoFormat() re-applies getPlayerData().getFormat
+            // (TYPE_VIDEO) shortly after - re-selecting a video track fires a re-buffer, which
+            // triggers that restore path and silently overwrote our override back to the saved
+            // global default (NO_VIDEO), undoing the fix. restoreVideoFormat() checks
+            // getTempVideoFormat() FIRST and prefers it over the persisted default (same
+            // mechanism HQDialogController's preset picker relies on via persistFormat()) - park
+            // our override there too so the restore path picks it up instead of clobbering it.
+            // Not persisted to disk (setTempVideoFormat doesn't call persistState()), so the
+            // user's saved global default is untouched - this really is per-video only.
+            getPlayerData().setTempVideoFormat(restoreFormat);
         }
 
         getPlayer().setButtonState(R.id.action_video_off, buttonState == PlayerUI.BUTTON_OFF ? PlayerUI.BUTTON_ON : PlayerUI.BUTTON_OFF);

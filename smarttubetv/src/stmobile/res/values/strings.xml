@@ -16,6 +16,7 @@
     <string name="mobile_search_voice">Voice search</string>
     <string name="mobile_search_voice_prompt">Speak to search</string>
     <string name="mobile_search_voice_unavailable">Voice search isn\'t available on this device.</string>
+    <string name="mobile_genre_all">All</string>
 
     <!-- Player bottom nav bar -->
     <string name="header_you">You</string>
@@ -52,6 +53,9 @@
     <!-- Channel page -->
     <string name="notification_bell">Notification preference</string>
     <string name="channel_avatar">Channel avatar</string>
+
+    <!-- Video off by default -->
+    <string name="mobile_video_off_title">Video off by default</string>
 
     <!-- Upload notifications (Part 2 - push) -->
     <string name="mobile_notifications_title">Upload notifications</string>

@@ -18,6 +18,7 @@ import com.liskovsoft.smartyoutubetv2.common.app.models.data.Video;
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.VideoGroup;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.BasePlayerController;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.manager.PlayerConstants;
+import com.liskovsoft.smartyoutubetv2.common.app.models.playback.manager.PlayerUI;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.AppDialogPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.dialogs.VideoActionPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.views.PlaybackView;
@@ -131,9 +132,22 @@ public class VideoLoaderController extends BasePlayerController {
         if (video.belongsToMusic()) {
             getPlayer().setFormat(FormatItem.NO_VIDEO);
             getPlayer().setFormat(getHighestBitrateAudioFormat());
+            // Drive the action_video_off button explicitly instead of relying on
+            // PlayerUIController.applyVideoOffButtonState() picking up the NO_VIDEO format on
+            // its own onVideoLoaded pass - that reads getVideoFormat() back from the track
+            // selector, which is one indirection too many to depend on for showing the
+            // thumbnail cover (mobile's applyVideoOffCover, wired to this same button).
+            getPlayer().setButtonState(R.id.action_video_off, PlayerUI.BUTTON_ON);
         } else {
-            getPlayer().setFormat(getPlayerData().getFormat(FormatItem.TYPE_VIDEO));
+            FormatItem videoFormat = getPlayerData().getFormat(FormatItem.TYPE_VIDEO);
+            getPlayer().setFormat(videoFormat);
             getPlayer().setFormat(getPlayerData().getFormat(FormatItem.TYPE_AUDIO));
+            // Mirror the music branch above: the user's saved default video format can itself
+            // be NO_VIDEO (global "video off" preset), so drive the button off what was
+            // actually just applied instead of hardcoding OFF - otherwise mobile's
+            // applyVideoOffCover never fires on the first load of such a video.
+            getPlayer().setButtonState(R.id.action_video_off,
+                    Helpers.equals(videoFormat, FormatItem.NO_VIDEO) ? PlayerUI.BUTTON_ON : PlayerUI.BUTTON_OFF);
         }
     }
 

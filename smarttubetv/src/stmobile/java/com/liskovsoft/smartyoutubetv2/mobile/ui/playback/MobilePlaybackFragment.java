@@ -87,6 +87,7 @@ public class MobilePlaybackFragment extends PlaybackFragment {
     private TextView mChannelView;
     private TextView mSubsView;
     private TextView mViewsView;
+    private ImageView mVideoOffCover;
     private RecyclerView mUpNextList;
     private UpNextRowAdapter mUpNextAdapter;
     private boolean mStripMode;
@@ -249,6 +250,11 @@ public class MobilePlaybackFragment extends PlaybackFragment {
 
         if (initPanelViews()) {
             bindHeader(video);
+            // Video-off can stay on across a video change (playlist/autoplay) - refresh the
+            // cover to the new video's thumbnail instead of leaving the previous one showing.
+            if (mVideoOffCover != null && mVideoOffCover.getVisibility() == View.VISIBLE) {
+                applyVideoOffCover(true);
+            }
         }
         applyMobileLayout();
 
@@ -306,6 +312,17 @@ public class MobilePlaybackFragment extends PlaybackFragment {
         mChannelView.setText(video.getAuthor() != null ? video.getAuthor() : "");
         mSubsView.setText(video.subscriberCount != null ? video.subscriberCount : "");
         mViewsView.setText(extractViews(video));
+
+        // Fallback for a video-off cover that should be showing but isn't: on a first video
+        // load, VideoLoaderController's setButtonState(action_video_off, ON) can fire while
+        // PlaybackPresenter's Video is still the lightweight Video.from(videoId) object (opened
+        // by id, e.g. deep link/continuation, not from a card) - getCardImageUrl() is null at
+        // that point, so applyVideoOffCover hides the cover with no retry. bindHeader() always
+        // gets the metadata-filled Video, so re-check here once it's actually available.
+        if (getButtonState(R.id.action_video_off) == PlayerUI.BUTTON_ON
+                && (mVideoOffCover == null || mVideoOffCover.getVisibility() != View.VISIBLE)) {
+            applyVideoOffCover(true);
+        }
         if (mPortraitLikeBtn != null) {
             mPortraitLikeBtn.setText(video.likeCount != null
                     ? Helpers.THUMB_UP + " " + video.likeCount : Helpers.THUMB_UP);
@@ -416,7 +433,81 @@ public class MobilePlaybackFragment extends PlaybackFragment {
         } else if (buttonId == R.id.action_thumbs_down) {
             if (mShortsDislikeBtn    != null) tintRailButton(mShortsDislikeBtn,    active);
             tintPortraitButton(mPortraitDislikeBtn, active);
+        } else if (buttonId == R.id.action_video_off) {
+            applyVideoOffCover(active);
         }
+    }
+
+    /**
+     * Video-off (audio-only) is a track-selection override in {@code PlayerUIController} - it
+     * never touches the ExoPlayer surface, so with no video track being decoded the surface just
+     * shows its last rendered frame / black. Cover it with the video's own thumbnail instead, the
+     * same image {@code VideoCardAdapter} shows for it in lists.
+     */
+    private void applyVideoOffCover(boolean videoOff) {
+        // PlayerUIController.resetButtonStates() (called from onNewVideo, i.e. right as a new
+        // video starts opening) can invoke setButtonState -> here before this fragment is
+        // attached to its activity - Glide.with(this) requires an attached fragment/activity and
+        // throws otherwise (crash seen in the wild: NPE from Glide.getRetriever via
+        // "not yet attached View or a Fragment where getActivity() returns null"). Skip until
+        // attached; setButtonState fires again once the video actually loads (onVideoLoaded),
+        // which happens after attachment, so the cover still ends up correct.
+        if (!isAdded()) {
+            return;
+        }
+        if (!ensureVideoOffCover()) {
+            return;
+        }
+        if (!videoOff) {
+            mVideoOffCover.setVisibility(View.GONE);
+            Glide.with(this).clear(mVideoOffCover);
+            return;
+        }
+        Video video = PlaybackPresenter.instance(getContext()).getVideo();
+        String coverUrl = video != null ? video.getCardImageUrl() : null;
+        if (coverUrl == null) {
+            mVideoOffCover.setVisibility(View.GONE);
+            return;
+        }
+        Glide.with(this).load(coverUrl).into(mVideoOffCover);
+        mVideoOffCover.setVisibility(View.VISIBLE);
+    }
+
+    /**
+     * Lazily creates and inserts the video-off cover directly into {@code R.id.surface_root}
+     * (the fork-local override {@code smarttubetv/src/main/res/layout/lb_playback_fragment.xml}
+     * - NOT the leanback-1.0.0 submodule's copy of that filename, which this one shadows via the
+     * normal Android resource-overlay mechanism and which is never actually inflated). That's an
+     * {@code AspectRatioFrameLayout} ExoPlayer's SurfaceView/TextureView is added into at index 0
+     * (see {@code SurfacePlaybackFragment.mVideoSurfaceRoot.addView(surfaceView, 0)}); adding the
+     * cover on top (default, last child) guarantees it draws above the surface, and surface_root
+     * itself sits below {@code playback_controls_dock} in their shared parent
+     * {@code playback_fragment_root}, so the transport controls stay above the cover too. An
+     * earlier attempt inserted the cover into playback_fragment_background instead - that view is
+     * always empty (the surface was never in it despite the name), so it never actually covered
+     * anything. Does not touch the submodule's XML, only reads the already-inflated view tree via
+     * plain findViewById/addView. Returns false if the fragment's view isn't up yet.
+     */
+    private boolean ensureVideoOffCover() {
+        if (mVideoOffCover != null) {
+            return true;
+        }
+        View root = getView();
+        if (root == null) {
+            return false;
+        }
+        ViewGroup surfaceRoot = root.findViewById(R.id.surface_root);
+        if (surfaceRoot == null) {
+            return false;
+        }
+        ImageView cover = new ImageView(surfaceRoot.getContext());
+        cover.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        cover.setBackgroundColor(android.graphics.Color.BLACK);
+        cover.setVisibility(View.GONE);
+        surfaceRoot.addView(cover,
+                new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        mVideoOffCover = cover;
+        return true;
     }
 
     /** Views/date: the first non-author segment of "Author • views • date". */
@@ -537,7 +628,10 @@ public class MobilePlaybackFragment extends PlaybackFragment {
             return handleShortsTouchEvent(event);
         }
 
-        if (handleWindowedSwipeEvent(event, playerView)) {
+        // Landscape full-screen: swipe-down-to-minimize is off (only the portrait strip has it) —
+        // a vertical drag there is easy to trigger by accident while reaching for the seek bar
+        // or transport controls on a wide screen.
+        if (mLayoutState != 0 && handleWindowedSwipeEvent(event, playerView)) {
             return true;
         }
 
@@ -550,10 +644,11 @@ public class MobilePlaybackFragment extends PlaybackFragment {
 
     /**
      * Swipe-down-to-minimize (mirrors the official YouTube app): a downward drag starting on the
-     * video surface, in the portrait strip or landscape full-screen (never Shorts, never over the
-     * below-video panel), hands the player to {@link MobilePlaybackActivity#enterWindowedMode()}
-     * once it clears a generous slop — well past Leanback's own tap/seek gestures, so an ordinary
-     * tap-to-reveal-controls or double-tap-to-seek is never swallowed as a false trigger.
+     * video surface, in the portrait strip only (never Shorts, never landscape full-screen, never
+     * over the below-video panel — see the mLayoutState != 0 guard at the call site), hands the
+     * player to {@link MobilePlaybackActivity#enterWindowedMode()} once it clears a generous slop
+     * — well past Leanback's own tap/seek gestures, so an ordinary tap-to-reveal-controls or
+     * double-tap-to-seek is never swallowed as a false trigger.
      */
     private boolean handleWindowedSwipeEvent(MotionEvent event, View playerView) {
         switch (event.getActionMasked()) {

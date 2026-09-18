@@ -30,6 +30,18 @@
         app:layout_constraintBottom_toBottomOf="parent" />
 
     <!--
+        Video-off cover is NOT declared here. Placing it as a sibling of the fragment in this
+        ConstraintLayout would draw it above the fragment's ENTIRE content (video surface AND
+        transport controls together, since they're both inside the fragment's own view subtree) -
+        there is no way to interleave a sibling view between two views of a different subtree.
+        Instead it's created programmatically in MobilePlaybackFragment and inserted directly into
+        R.id.surface_root (from the fork-local smarttubetv/src/main/res/layout/lb_playback_fragment.xml
+        - NOT the leanback-1.0.0 submodule's same-named layout, which that file shadows and which is
+        never actually inflated), the AspectRatioFrameLayout ExoPlayer's own SurfaceView/TextureView
+        is added into - see MobilePlaybackFragment.ensureVideoOffCover().
+    -->
+
+    <!--
         Shorts pager filmstrip posters: full-screen thumbnails of the previous / next Short.
         Parked one screen-height above / below and slid in with the drag (see
         MobilePlaybackFragment.setShortsPageTranslation). Hidden except during an active swipe.

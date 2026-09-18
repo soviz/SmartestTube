@@ -36,6 +36,7 @@ public class MobileMusicFolderActivity extends MobileActivity {
     @Override
     public void finish() {
         getViewManager().removeTop(this);
+        MusicFolderStore.clearPendingGroup();
         super.finish();
     }
 }

@@ -11,6 +11,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.GridLayoutManager;
+import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.VideoGroup;
@@ -25,9 +26,18 @@ import com.liskovsoft.smartyoutubetv2.tv.R;
  * {@link MusicFolderStore}, not an incrementally-loaded feed.
  */
 public class MobileMusicFolderFragment extends Fragment {
+    /**
+     * Folders with this many videos or fewer are treated as a ready-made set of clips and
+     * shown as a plain list (thumbnail left, title/author/duration right) instead of a grid.
+     * Larger folders are mixes/auto-playlists (YouTube Mix is normally ~25 videos) and keep
+     * the grid.
+     */
+    private static final int MAX_CLIP_LIST_SIZE = 50;
+
     private RecyclerView mGrid;
     private TextView mTitleView;
     private VideoCardAdapter mAdapter;
+    private boolean mListMode;
 
     @Nullable
     @Override
@@ -49,13 +59,17 @@ public class MobileMusicFolderFragment extends Fragment {
             }
         });
 
+        VideoGroup group = MusicFolderStore.getPendingGroup();
+        mListMode = group != null && group.getVideos() != null && group.getVideos().size() <= MAX_CLIP_LIST_SIZE;
+
         int span = getResources().getInteger(R.integer.mobile_grid_span);
         int cardWidth = getResources().getDisplayMetrics().widthPixels / span;
-        mAdapter = new VideoCardAdapter(cardWidth, mVideoClick, mVideoLongClick);
-        mGrid.setLayoutManager(new GridLayoutManager(getContext(), span));
+        mAdapter = new VideoCardAdapter(cardWidth, mListMode, mVideoClick, mVideoLongClick);
+        mGrid.setLayoutManager(mListMode
+                ? new LinearLayoutManager(getContext())
+                : new GridLayoutManager(getContext(), span));
         mGrid.setAdapter(mAdapter);
 
-        VideoGroup group = MusicFolderStore.takePendingGroup();
         if (group != null) {
             if (mTitleView != null) {
                 mTitleView.setText(group.getTitle());
@@ -67,6 +81,9 @@ public class MobileMusicFolderFragment extends Fragment {
     @Override
     public void onConfigurationChanged(@NonNull Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
+        if (mListMode) {
+            return;
+        }
         int span = getResources().getInteger(R.integer.mobile_grid_span);
         if (mGrid != null && mGrid.getLayoutManager() instanceof GridLayoutManager) {
             ((GridLayoutManager) mGrid.getLayoutManager()).setSpanCount(span);

@@ -12,7 +12,10 @@ import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.PopupMenu;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
@@ -41,7 +44,9 @@ import com.liskovsoft.smartyoutubetv2.common.app.presenters.SearchPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.dialogs.AccountSelectionPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.settings.AccountSettingsPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.views.BrowseView;
+import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.FormatItem;
 import com.liskovsoft.smartyoutubetv2.common.misc.MediaServiceManager;
+import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerData;
 import com.liskovsoft.smartyoutubetv2.mobile.notifications.NotificationPollWorker;
 import com.liskovsoft.smartyoutubetv2.mobile.ui.about.MobileAboutActivity;
 import com.liskovsoft.smartyoutubetv2.mobile.ui.prefs.MobileNotificationPrefs;
@@ -49,7 +54,9 @@ import com.liskovsoft.smartyoutubetv2.mobile.ui.prefs.MobileThemePrefs;
 import com.liskovsoft.smartyoutubetv2.tv.R;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Native portrait Home screen. Implements {@link BrowseView} and is driven by the
@@ -82,9 +89,29 @@ public class MobileBrowseFragment extends Fragment implements BrowseView, MediaS
     private boolean mProgressShowing;
     private boolean mSwipeRefreshing;
     private boolean mSectionSelected;
+    private int mCurrentSectionId = -1;
     private int mGridCardWidth;
     private int mGridSpan;
     private int mShelfCardWidth;
+    // Music genre filter (see FolderCardAdapter's class doc): a folder's own title doubles
+    // as its "genre" - there's no separate genre field anywhere in the data. Above this count
+    // the chip row would overflow into multiple lines / require horizontal scrolling to read
+    // at a glance, so it's replaced by a single dropdown button instead.
+    private static final int MAX_GENRE_CHIPS = 5;
+    private HorizontalScrollView mGenreChipsScroll;
+    private LinearLayout mGenreChips;
+    private View mGenreDropdown;
+    private TextView mGenreDropdownLabel;
+    private List<String> mGenres = new ArrayList<>();
+    @Nullable
+    private String mSelectedGenre; // null = "All"
+    // Flat grid sections (Home, Subscriptions, History, ...): each VideoGroup continuation
+    // arrives via VideoGroup.from(baseGroup, ...), which mutates and re-sends the SAME group
+    // object with the full cumulative video list (see VideoGroupObjectAdapter.append()
+    // upstream, which relies on this same contract). Track how many of each group's videos
+    // are already appended to the flat mGridAdapter list, so a continuation only
+    // range-inserts its new tail instead of redrawing everything.
+    private final Map<VideoGroup, Integer> mGridGroupSizes = new HashMap<>();
 
     @Nullable
     @Override
@@ -105,6 +132,11 @@ public class MobileBrowseFragment extends Fragment implements BrowseView, MediaS
         mEmptyContainer = view.findViewById(R.id.empty_container);
         mEmptyButton = view.findViewById(R.id.empty_button);
         mToolbarTitle = view.findViewById(R.id.toolbar_title);
+        mGenreChipsScroll = view.findViewById(R.id.mobile_genre_chips_scroll);
+        mGenreChips = view.findViewById(R.id.mobile_genre_chips);
+        mGenreDropdown = view.findViewById(R.id.mobile_genre_dropdown);
+        mGenreDropdownLabel = view.findViewById(R.id.mobile_genre_dropdown_label);
+        mGenreDropdown.setOnClickListener(v -> showGenreDropdownMenu());
 
         view.findViewById(R.id.btn_menu).setOnClickListener(v -> {
             if (mDrawer.isDrawerOpen(GravityCompat.START)) {
@@ -154,9 +186,9 @@ public class MobileBrowseFragment extends Fragment implements BrowseView, MediaS
         sectionList.setLayoutManager(new LinearLayoutManager(getContext()));
         sectionList.setAdapter(mSectionAdapter);
 
-        // Open the menu with an on-screen right-swipe — the left screen edge belongs to
-        // the system Back gesture and must not be used for this. See mSwipeToOpenMenu.
-        mContentList.addOnItemTouchListener(mSwipeToOpenMenu);
+        // Horizontal swipe switches between the bottom nav bar tabs (Home/Music/History).
+        // See mSwipeToSwitchTab.
+        mContentList.addOnItemTouchListener(mSwipeToSwitchTab);
 
         mSwipeRefresh.setColorSchemeResources(R.color.brand_accent);
         mSwipeRefresh.setProgressBackgroundColorSchemeResource(R.color.mobile_surface);
@@ -289,6 +321,7 @@ public class MobileBrowseFragment extends Fragment implements BrowseView, MediaS
         }
         // Section list is being rebuilt — re-arm the default-section auto-open.
         mSectionSelected = false;
+        mCurrentSectionId = -1;
     }
 
     @Override
@@ -298,6 +331,7 @@ public class MobileBrowseFragment extends Fragment implements BrowseView, MediaS
         }
         BrowseSection section = mSectionAdapter.getItem(index);
         mSectionSelected = true;
+        mCurrentSectionId = section.getId();
         mSectionAdapter.setSelected(section);
         if (mToolbarTitle != null) {
             mToolbarTitle.setText(section.getTitle());
@@ -332,6 +366,10 @@ public class MobileBrowseFragment extends Fragment implements BrowseView, MediaS
                 if (mShelfAdapter != null) mShelfAdapter.clear();
                 if (mGridAdapter != null) mGridAdapter.clear();
                 if (mFolderAdapter != null) mFolderAdapter.clear();
+                mGridGroupSizes.clear();
+                mGenres = new ArrayList<>();
+                mSelectedGenre = null;
+                hideGenreFilter();
                 hideEmptyMessage();
                 break;
             case VideoGroup.ACTION_REMOVE:
@@ -354,8 +392,7 @@ public class MobileBrowseFragment extends Fragment implements BrowseView, MediaS
                 } else if (mShelfAdapter != null) {
                     mShelfAdapter.appendGroup(group);
                 } else if (mGridAdapter != null) {
-                    // A continuation carries the full cumulative list, so replace.
-                    mGridAdapter.setVideos(group.getVideos());
+                    appendGridGroup(group);
                 }
                 break;
         }
@@ -389,6 +426,11 @@ public class MobileBrowseFragment extends Fragment implements BrowseView, MediaS
                     context.getString(R.string.mobile_theme_title),
                     this::showThemePicker,
                     R.drawable.settings_theme));
+            items.add(SettingsItem.forSwitch(
+                    context.getString(R.string.mobile_video_off_title),
+                    R.drawable.settings_video_off,
+                    isVideoOffByDefault(context),
+                    this::setVideoOffByDefault));
             items.add(new SettingsItem(
                     context.getString(R.string.mobile_notifications_title),
                     this::showNotificationsToggle,
@@ -444,6 +486,27 @@ public class MobileBrowseFragment extends Fragment implements BrowseView, MediaS
     }
 
     /**
+     * Phone-only explicit on/off toggle for "video off by default" - a plain Settings row
+     * instead of burying this in the quality-preset picker, where NO_VIDEO isn't even offered
+     * as a choice. Reads/writes the same {@link PlayerData#setFormat} state the in-player
+     * video-off button and {@code VideoLoaderController}'s per-video default format use, so
+     * there's a single source of truth: turning this on here is equivalent to toggling video
+     * off in the player and leaving it off, and toggling it off in the player doesn't drift
+     * out of sync with this row (both read/write PlayerData.TYPE_VIDEO the same way).
+     */
+    private boolean isVideoOffByDefault(Context context) {
+        return FormatItem.NO_VIDEO.equals(PlayerData.instance(context).getFormat(FormatItem.TYPE_VIDEO));
+    }
+
+    private void setVideoOffByDefault(boolean turnOn) {
+        Context context = getContext();
+        if (context == null) {
+            return;
+        }
+        PlayerData.instance(context).setFormat(turnOn ? FormatItem.NO_VIDEO : FormatItem.VIDEO_AUTO);
+    }
+
+    /**
      * Phone-only "Upload notifications" on/off toggle (Part 2 — push). Drives
      * {@link MobileNotificationPrefs} and (re)schedules {@link NotificationPollWorker}. On enable,
      * asks for the Android 13+ POST_NOTIFICATIONS permission via the host activity.
@@ -481,6 +544,10 @@ public class MobileBrowseFragment extends Fragment implements BrowseView, MediaS
         if (mShelfAdapter != null) mShelfAdapter.clear();
         if (mGridAdapter != null) mGridAdapter.clear();
         if (mFolderAdapter != null) mFolderAdapter.clear();
+        mGridGroupSizes.clear();
+        mGenres = new ArrayList<>();
+        mSelectedGenre = null;
+        hideGenreFilter();
     }
 
     @Override
@@ -558,15 +625,32 @@ public class MobileBrowseFragment extends Fragment implements BrowseView, MediaS
     private void setupContentForType(BrowseSection section) {
         hideEmptyMessage();
         mContentList.clearOnScrollListeners();
+        mGridGroupSizes.clear();
+        hideGenreFilter();
         int type = section.getType();
         if (type == BrowseSection.TYPE_ROW && section.getId() == MediaGroup.TYPE_MUSIC) {
             // Music: folders (one cover card per row) instead of horizontal shelves.
             mFolderAdapter = new FolderCardAdapter(mGridCardWidth, mFolderClick);
+            mFolderAdapter.setOnGenresChanged(this::updateGenreFilterUi);
             mShelfAdapter = null;
             mGridAdapter = null;
             mSettingsAdapter = null;
             mContentList.setLayoutManager(new GridLayoutManager(getContext(), mGridSpan));
             mContentList.setAdapter(mFolderAdapter);
+            mContentList.addOnScrollListener(mFolderScrollListener);
+            mGenres = new ArrayList<>();
+            mSelectedGenre = null;
+        } else if (type == BrowseSection.TYPE_ROW && section.getId() == MediaGroup.TYPE_HOME) {
+            // Home ("Recommended"): a single full-width column instead of horizontal
+            // shelves-per-topic, with lazy-load-on-scroll like the other grid sections
+            // (span 1, so each card fills the screen width).
+            mGridAdapter = new VideoCardAdapter(screenWidthPx(), mVideoClick, mVideoLongClick);
+            mShelfAdapter = null;
+            mFolderAdapter = null;
+            mSettingsAdapter = null;
+            mContentList.setLayoutManager(new LinearLayoutManager(getContext()));
+            mContentList.setAdapter(mGridAdapter);
+            mContentList.addOnScrollListener(mGridScrollListener);
         } else if (type == BrowseSection.TYPE_ROW) {
             mShelfAdapter = new ShelfAdapter(mShelfCardWidth, mVideoClick, mVideoLongClick,
                     mShelfScrollEnd);
@@ -603,7 +687,10 @@ public class MobileBrowseFragment extends Fragment implements BrowseView, MediaS
             ((GridLayoutManager) mContentList.getLayoutManager()).setSpanCount(mGridSpan);
         }
         if (mGridAdapter != null) {
-            mGridAdapter.setCardWidth(mGridCardWidth);
+            boolean isHomeFullWidth = mContentList != null
+                    && mContentList.getLayoutManager() instanceof LinearLayoutManager
+                    && !(mContentList.getLayoutManager() instanceof GridLayoutManager);
+            mGridAdapter.setCardWidth(isHomeFullWidth ? screenWidthPx() : mGridCardWidth);
         }
         if (mFolderAdapter != null) {
             mFolderAdapter.setCardWidth(mGridCardWidth);
@@ -647,10 +734,14 @@ public class MobileBrowseFragment extends Fragment implements BrowseView, MediaS
         }
     };
 
-    private final RecyclerView.OnScrollListener mGridScrollListener = new RecyclerView.OnScrollListener() {
+    /**
+     * Music folders: reveal the next buffered page (see {@link FolderCardAdapter#revealMore})
+     * as the grid nears its end, instead of the whole burst-fetched list appearing at once.
+     */
+    private final RecyclerView.OnScrollListener mFolderScrollListener = new RecyclerView.OnScrollListener() {
         @Override
         public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
-            if (dy <= 0 || mProgressShowing || mGridAdapter == null) {
+            if (dy <= 0 || mFolderAdapter == null || !mFolderAdapter.hasMore()) {
                 return;
             }
             RecyclerView.LayoutManager lm = recyclerView.getLayoutManager();
@@ -658,6 +749,27 @@ public class MobileBrowseFragment extends Fragment implements BrowseView, MediaS
                 return;
             }
             int lastVisible = ((GridLayoutManager) lm).findLastVisibleItemPosition();
+            if (lastVisible >= mFolderAdapter.getItemCount() - 4) {
+                mFolderAdapter.revealMore();
+            }
+        }
+    };
+
+    private final RecyclerView.OnScrollListener mGridScrollListener = new RecyclerView.OnScrollListener() {
+        @Override
+        public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
+            if (dy <= 0 || mProgressShowing || mGridAdapter == null) {
+                return;
+            }
+            RecyclerView.LayoutManager lm = recyclerView.getLayoutManager();
+            int lastVisible;
+            if (lm instanceof GridLayoutManager) {
+                lastVisible = ((GridLayoutManager) lm).findLastVisibleItemPosition();
+            } else if (lm instanceof LinearLayoutManager) {
+                lastVisible = ((LinearLayoutManager) lm).findLastVisibleItemPosition();
+            } else {
+                return;
+            }
             if (lastVisible >= mGridAdapter.getItemCount() - 4) {
                 Video last = mGridAdapter.getLast();
                 if (last != null && mPresenter != null) {
@@ -666,6 +778,120 @@ public class MobileBrowseFragment extends Fragment implements BrowseView, MediaS
             }
         }
     };
+
+    private int screenWidthPx() {
+        return getResources().getDisplayMetrics().widthPixels;
+    }
+
+    // ----- Music genre filter -----
+
+    private void hideGenreFilter() {
+        if (mGenreChipsScroll != null) mGenreChipsScroll.setVisibility(View.GONE);
+        if (mGenreDropdown != null) mGenreDropdown.setVisibility(View.GONE);
+    }
+
+    /**
+     * Called by {@link FolderCardAdapter} whenever the set of known genres (distinct folder
+     * titles, excluding the pinned "Liked Music" folder) changes - i.e. as new folders arrive.
+     */
+    private void updateGenreFilterUi(List<String> genres, @Nullable String pinnedTitle) {
+        mGenres = genres;
+        if (getContext() == null || mGenreChipsScroll == null || mGenreDropdown == null) {
+            return;
+        }
+        if (genres.isEmpty()) {
+            hideGenreFilter();
+            return;
+        }
+        if (genres.size() > MAX_GENRE_CHIPS) {
+            mGenreChipsScroll.setVisibility(View.GONE);
+            mGenreDropdown.setVisibility(View.VISIBLE);
+            mGenreDropdownLabel.setText(mSelectedGenre != null ? mSelectedGenre : getString(R.string.mobile_genre_all));
+        } else {
+            mGenreDropdown.setVisibility(View.GONE);
+            mGenreChipsScroll.setVisibility(View.VISIBLE);
+            buildGenreChips(genres);
+        }
+    }
+
+    private void buildGenreChips(List<String> genres) {
+        if (mGenreChips == null || getContext() == null) {
+            return;
+        }
+        mGenreChips.removeAllViews();
+        mGenreChips.addView(makeGenreChip(getString(R.string.mobile_genre_all), mSelectedGenre == null));
+        for (String genre : genres) {
+            mGenreChips.addView(makeGenreChip(genre, genre.equals(mSelectedGenre)));
+        }
+    }
+
+    private View makeGenreChip(String title, boolean selected) {
+        TextView chip = new TextView(getContext());
+        chip.setText(title);
+        chip.setSingleLine(true);
+        chip.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        chip.setMaxWidth((int) (screenWidthPx() * 0.55f));
+        chip.setTextSize(13);
+        chip.setTextColor(ContextCompat.getColorStateList(getContext(), R.color.mobile_genre_chip_text));
+        chip.setBackgroundResource(R.drawable.mobile_genre_chip_bg);
+        chip.setSelected(selected);
+        int hPad = (int) (12 * getResources().getDisplayMetrics().density);
+        int vPad = (int) (6 * getResources().getDisplayMetrics().density);
+        chip.setPadding(hPad, vPad, hPad, vPad);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        int marginEnd = (int) (8 * getResources().getDisplayMetrics().density);
+        lp.setMargins(0, 0, marginEnd, 0);
+        chip.setLayoutParams(lp);
+        chip.setOnClickListener(v -> selectGenre(getString(R.string.mobile_genre_all).equals(title) ? null : title));
+        return chip;
+    }
+
+    private void showGenreDropdownMenu() {
+        if (getContext() == null || mGenreDropdown == null) {
+            return;
+        }
+        PopupMenu menu = new PopupMenu(getContext(), mGenreDropdown);
+        menu.getMenu().add(getString(R.string.mobile_genre_all));
+        for (String genre : mGenres) {
+            menu.getMenu().add(genre);
+        }
+        menu.setOnMenuItemClickListener(item -> {
+            CharSequence title = item.getTitle();
+            selectGenre(getString(R.string.mobile_genre_all).contentEquals(title) ? null : title.toString());
+            return true;
+        });
+        menu.show();
+    }
+
+    private void selectGenre(@Nullable String genre) {
+        mSelectedGenre = genre;
+        if (mFolderAdapter != null) {
+            mFolderAdapter.setGenreFilter(genre);
+        }
+        updateGenreFilterUi(mGenres, null);
+    }
+
+    /**
+     * Appends a flat-grid VideoGroup (Home, Subscriptions, History, ...) without a full
+     * {@code notifyDataSetChanged}. A continuation re-sends the SAME group object mutated
+     * in place with the full cumulative video list (see {@code VideoGroup.from(baseGroup, ...)}
+     * upstream) — so this range-inserts only the tail past what was already appended for that
+     * group, instead of redrawing the whole list on every page (which caused visible
+     * thumbnail flicker on first load, when several groups/pages arrive back-to-back).
+     */
+    private void appendGridGroup(VideoGroup group) {
+        Integer alreadyAppended = mGridGroupSizes.get(group);
+        List<Video> videos = group.getVideos();
+        int total = videos != null ? videos.size() : 0;
+        if (alreadyAppended == null) {
+            mGridAdapter.appendVideos(videos);
+            mGridGroupSizes.put(group, total);
+        } else if (total > alreadyAppended) {
+            mGridAdapter.appendVideos(videos.subList(alreadyAppended, total));
+            mGridGroupSizes.put(group, total);
+        }
+    }
 
     private void showEmptyMessage(String message) {
         if (mEmptyContainer == null) {
@@ -683,12 +909,14 @@ public class MobileBrowseFragment extends Fragment implements BrowseView, MediaS
     }
 
     /**
-     * Opens the drawer on an on-screen right-swipe. Registered on the outer content
-     * RecyclerView, so it is consulted before the inner shelves: a shelf that can still
-     * scroll toward its start keeps the gesture; a shelf already at its start (or a grid
-     * section with no horizontal scroller) yields it to open the menu.
+     * Switches between the bottom nav bar tabs (Home/Music/History, in that order) on an
+     * on-screen horizontal swipe — left goes to the next tab, right to the previous one.
+     * Registered on the outer content RecyclerView, so it is consulted before the inner
+     * shelves: a shelf that can still scroll toward the swipe direction keeps the gesture;
+     * a shelf already at that end (or a grid section with no horizontal scroller) yields it
+     * to switch tabs instead.
      */
-    private final RecyclerView.OnItemTouchListener mSwipeToOpenMenu = new RecyclerView.OnItemTouchListener() {
+    private final RecyclerView.OnItemTouchListener mSwipeToSwitchTab = new RecyclerView.OnItemTouchListener() {
         private float mDownX;
         private float mDownY;
         private boolean mDecided;
@@ -714,11 +942,9 @@ public class MobileBrowseFragment extends Fragment implements BrowseView, MediaS
                         return false; // wait for a clear direction
                     }
                     mDecided = true;
-                    if (dx > 0 && dx > Math.abs(dy) && shelfAtStart(rv, mDownX, mDownY)) {
+                    if (Math.abs(dx) > Math.abs(dy) && shelfYieldsSwipe(rv, mDownX, mDownY, dx > 0)) {
                         mTriggered = true;
-                        if (mDrawer != null) {
-                            mDrawer.openDrawer(GravityCompat.START);
-                        }
+                        switchToAdjacentTab(dx > 0 ? -1 : 1);
                     }
                     return mTriggered;
                 default:
@@ -738,11 +964,11 @@ public class MobileBrowseFragment extends Fragment implements BrowseView, MediaS
     };
 
     /**
-     * True if a right-swipe at (x, y) should open the menu: either there is no horizontal
-     * shelf under the finger (grid section or empty area), or the shelf there is already
-     * at its start and cannot scroll further toward it.
+     * True if a horizontal swipe at (x, y) should switch tabs instead of scrolling a shelf:
+     * either there is no horizontal shelf under the finger (grid section or empty area), or
+     * the shelf there is already at the end the swipe is heading toward.
      */
-    private boolean shelfAtStart(RecyclerView contentList, float x, float y) {
+    private boolean shelfYieldsSwipe(RecyclerView contentList, float x, float y, boolean swipingRight) {
         View child = contentList.findChildViewUnder(x, y);
         if (child == null) {
             return true;
@@ -751,6 +977,67 @@ public class MobileBrowseFragment extends Fragment implements BrowseView, MediaS
         if (shelfList == null) {
             return true;
         }
-        return !shelfList.canScrollHorizontally(-1);
+        // Swiping right drags content toward its start (canScrollHorizontally(-1)); swiping
+        // left drags it toward its end (canScrollHorizontally(1)).
+        return !shelfList.canScrollHorizontally(swipingRight ? -1 : 1);
+    }
+
+    /** Moves the bottom-nav selection by {@code direction} (+1 = next tab, -1 = previous). */
+    private void switchToAdjacentTab(int direction) {
+        if (mSectionAdapter == null) {
+            return;
+        }
+        int[] tabSectionIds = {MediaGroup.TYPE_HOME, MediaGroup.TYPE_MUSIC, MediaGroup.TYPE_HISTORY};
+        int currentTab = -1;
+        for (int i = 0; i < tabSectionIds.length; i++) {
+            if (tabSectionIds[i] == mCurrentSectionId) {
+                currentTab = i;
+                break;
+            }
+        }
+        if (currentTab < 0) {
+            return;
+        }
+        int nextTab = currentTab + direction;
+        if (nextTab < 0 || nextTab >= tabSectionIds.length) {
+            return;
+        }
+        int index = mSectionAdapter.indexOfSection(tabSectionIds[nextTab]);
+        if (index >= 0) {
+            animateTabSwitch(direction, () -> selectSection(index, false));
+        }
+    }
+
+    /**
+     * Page-turn transition for a tab switch: slides the outgoing content off in the swipe
+     * direction, swaps it for the new tab's content (via {@code onSwitch}, mid-flight while
+     * off-screen so the swap itself isn't visible), then slides the new content in from the
+     * opposite side. {@code direction} is the same +1/-1 (next/previous tab) switchToAdjacentTab
+     * uses, which is also the new content's arrival side: +1 (next tab, swiped in from the
+     * screen's right edge) arrives from the right, -1 from the left.
+     */
+    private void animateTabSwitch(int direction, Runnable onSwitch) {
+        if (mContentList == null) {
+            onSwitch.run();
+            return;
+        }
+        float width = mContentList.getWidth();
+        if (width <= 0) {
+            onSwitch.run();
+            return;
+        }
+        mContentList.animate().cancel();
+        mContentList.animate()
+                .translationX(-direction * width)
+                .setDuration(140)
+                .withEndAction(() -> {
+                    onSwitch.run();
+                    mContentList.setTranslationX(direction * width);
+                    mContentList.animate()
+                            .translationX(0)
+                            .setDuration(140)
+                            .start();
+                })
+                .start();
     }
 }

@@ -72,6 +72,63 @@
                 android:background="?android:attr/selectableItemBackground" />
         </LinearLayout>
 
+        <!--
+            Music genre filter: a row of chips (one per distinct folder title, e.g.
+            "Mixes for you", "Recently played") plus "All". Shown only for the Music section
+            (MobileBrowseFragment.setupContentForType); swaps to a dropdown-style single
+            button when there are too many genres to fit as chips (see
+            MobileBrowseFragment.MAX_GENRE_CHIPS / showGenreDropdown()).
+        -->
+        <HorizontalScrollView
+            android:id="@+id/mobile_genre_chips_scroll"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:visibility="gone"
+            android:scrollbars="none"
+            android:background="@color/mobile_background">
+
+            <LinearLayout
+                android:id="@+id/mobile_genre_chips"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:paddingTop="8dp"
+                android:paddingBottom="8dp" />
+        </HorizontalScrollView>
+
+        <LinearLayout
+            android:id="@+id/mobile_genre_dropdown"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:visibility="gone"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="8dp"
+            android:background="?android:attr/selectableItemBackground">
+
+            <TextView
+                android:id="@+id/mobile_genre_dropdown_label"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textColor="@color/mobile_text_primary"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingStart="8dp"
+                android:textColor="@color/mobile_text_secondary"
+                android:textSize="16sp"
+                android:text="▾" />
+        </LinearLayout>
+
         <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"

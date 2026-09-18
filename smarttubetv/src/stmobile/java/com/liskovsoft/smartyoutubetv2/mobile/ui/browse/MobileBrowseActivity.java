@@ -10,6 +10,7 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import com.liskovsoft.smartyoutubetv2.mobile.ui.base.MobileActivity;
+import com.liskovsoft.smartyoutubetv2.mobile.ui.prefs.MobileDefaultsMigration;
 import com.liskovsoft.smartyoutubetv2.tv.R;
 
 /**
@@ -22,6 +23,7 @@ public class MobileBrowseActivity extends MobileActivity {
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        MobileDefaultsMigration.applyOnce(this);
         setContentView(R.layout.mobile_browse_activity);
 
         if (getSupportFragmentManager().findFragmentById(R.id.mobile_browse_root) == null) {

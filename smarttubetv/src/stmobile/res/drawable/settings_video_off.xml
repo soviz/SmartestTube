@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Video-off row icon for the stmobile Settings list. Material Design
+    "videocam_off" silhouette.
+
+    The ImageView in mobile_settings_item.xml tints the drawable with
+    @color/mobile_text_primary, so the fillColor here only needs to be opaque
+    (white) - the tint recolours it for the current theme.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M21,6.5l-4,4V7c0,-0.55 -0.45,-1 -1,-1H9.82l11.46,11.46c0.46,-0.17 0.72,-0.7 0.72,-1.29V6.5zM3.27,2L2,3.27 4.73,6H4c-0.55,0 -1,0.45 -1,1v10c0,0.55 0.45,1 1,1h12c0.21,0 0.39,-0.08 0.54,-0.18l1.19,1.19L19,19.73 20.73,18 3.27,2z" />
+</vector>

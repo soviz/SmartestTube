@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Genre chip label color: dark text on the accent fill when selected (matches
+     brand_accent_on, the token used elsewhere for text on top of mobile_accent), the normal
+     body text color otherwise. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_selected="true" android:color="@color/brand_accent_on" />
+    <item android:color="@color/mobile_text_primary" />
+</selector>

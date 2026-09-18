@@ -28,12 +28,23 @@ public class VideoCardAdapter extends RecyclerView.Adapter<VideoCardAdapter.View
     }
 
     private int mCardWidth;
+    private final boolean mListMode;
     private final OnVideoAction mClick;
     private final OnVideoAction mLongClick;
     private final List<Video> mVideos = new ArrayList<>();
 
     public VideoCardAdapter(int cardWidth, OnVideoAction click, OnVideoAction longClick) {
+        this(cardWidth, false, click, longClick);
+    }
+
+    /**
+     * @param listMode true renders each item as a full-width row (thumbnail left, text right)
+     *                 instead of the default grid card. Used for Music folders that are a
+     *                 plain track list (few items) rather than a mix (many items).
+     */
+    public VideoCardAdapter(int cardWidth, boolean listMode, OnVideoAction click, OnVideoAction longClick) {
         mCardWidth = cardWidth;
+        mListMode = listMode;
         mClick = click;
         mLongClick = longClick;
     }
@@ -98,12 +109,20 @@ public class VideoCardAdapter extends RecyclerView.Adapter<VideoCardAdapter.View
     @Override
     public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         View view = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.mobile_video_card, parent, false);
-        if (view.getLayoutParams() != null) {
-            view.getLayoutParams().width = mCardWidth;
-        }
+                .inflate(mListMode ? R.layout.mobile_video_row : R.layout.mobile_video_card, parent, false);
         ViewHolder holder = new ViewHolder(view);
-        holder.thumbFrame.getLayoutParams().height = mCardWidth * 9 / 16;
+
+        if (mListMode) {
+            // Row thumbnail is a fixed-size square-ish box, not a full-width 16:9 card.
+            int thumbWidth = mCardWidth * 2 / 3;
+            holder.thumbFrame.getLayoutParams().width = thumbWidth;
+            holder.thumbFrame.getLayoutParams().height = thumbWidth * 9 / 16;
+        } else {
+            if (view.getLayoutParams() != null) {
+                view.getLayoutParams().width = mCardWidth;
+            }
+            holder.thumbFrame.getLayoutParams().height = mCardWidth * 9 / 16;
+        }
         return holder;
     }
 
@@ -111,26 +130,61 @@ public class VideoCardAdapter extends RecyclerView.Adapter<VideoCardAdapter.View
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         // Re-apply width on every bind so setCardWidth() (orientation change) resizes
         // recycled cards, keeping each card the width of its grid column.
-        if (holder.itemView.getLayoutParams() != null) {
-            holder.itemView.getLayoutParams().width = mCardWidth;
+        if (mListMode) {
+            int thumbWidth = mCardWidth * 2 / 3;
+            holder.thumbFrame.getLayoutParams().width = thumbWidth;
+            holder.thumbFrame.getLayoutParams().height = thumbWidth * 9 / 16;
+        } else {
+            if (holder.itemView.getLayoutParams() != null) {
+                holder.itemView.getLayoutParams().width = mCardWidth;
+            }
+            holder.thumbFrame.getLayoutParams().height = mCardWidth * 9 / 16;
         }
-        holder.thumbFrame.getLayoutParams().height = mCardWidth * 9 / 16;
 
         Video video = mVideos.get(position);
         holder.title.setText(video.getTitle());
         String author = video.getAuthor();
-        holder.author.setText(author != null ? author : "");
-
-        // Duration/length badge overlaid on the thumbnail (YouTube-style). video.badge holds
-        // the duration text ("12:34") for normal videos and occasionally a label ("LIVE").
-        // Explicit GONE branch matters: cards are recycled, so a badge-less video must clear
-        // a badge left over from a recycled holder.
         String badge = video.badge;
-        if (badge != null && !badge.isEmpty()) {
-            holder.duration.setText(badge);
-            holder.duration.setVisibility(View.VISIBLE);
+
+        if (mListMode) {
+            // Row's second line is view count + publish date only - no channel/author, since
+            // music clips only expose the channel's raw "@handle" (no readable channel name),
+            // see Video.getAuthor()/MusicItem.getUserName(). Duration is a badge overlaid on
+            // the thumbnail here too, same as the grid card.
+            String meta = extractMeta(video.getSecondTitleFull(), author);
+            holder.author.setText(meta != null ? meta : "");
+
+            if (badge != null && !badge.isEmpty()) {
+                holder.duration.setText(badge);
+                holder.duration.setVisibility(View.VISIBLE);
+            } else {
+                holder.duration.setVisibility(View.GONE);
+            }
         } else {
-            holder.duration.setVisibility(View.GONE);
+            holder.author.setText(author != null ? author : "");
+
+            // View count + publish date, e.g. "1.2M views • 3 days ago". getSecondTitleFull()
+            // is the raw "Channel • views • published" string the author was parsed out of
+            // (see Video.getAuthor()/extractAuthor()); re-join every segment except the one
+            // that matched as the author.
+            String meta = extractMeta(video.getSecondTitleFull(), author);
+            if (meta != null && !meta.isEmpty()) {
+                holder.meta.setText("  •  " + meta);
+                holder.meta.setVisibility(View.VISIBLE);
+            } else {
+                holder.meta.setVisibility(View.GONE);
+            }
+
+            // Duration/length badge overlaid on the thumbnail (YouTube-style). video.badge holds
+            // the duration text ("12:34") for normal videos and occasionally a label ("LIVE").
+            // Explicit GONE branch matters: cards are recycled, so a badge-less video must clear
+            // a badge left over from a recycled holder.
+            if (badge != null && !badge.isEmpty()) {
+                holder.duration.setText(badge);
+                holder.duration.setVisibility(View.VISIBLE);
+            } else {
+                holder.duration.setVisibility(View.GONE);
+            }
         }
 
         Glide.with(holder.itemView.getContext())
@@ -150,12 +204,43 @@ public class VideoCardAdapter extends RecyclerView.Adapter<VideoCardAdapter.View
         });
     }
 
+    /**
+     * Re-joins {@code secondTitle}'s "•"-separated segments (channel, views, published date,
+     * labels like "LIVE"/"4K") minus whichever one segment {@link Video#getAuthor()} already
+     * matched as the channel name, giving the remaining "views • published date" (order as
+     * returned by the API, not reordered).
+     */
+    private static String extractMeta(CharSequence secondTitle, String author) {
+        if (secondTitle == null) {
+            return null;
+        }
+        String[] parts = secondTitle.toString().split(Video.TERTIARY_TEXT_DELIM);
+        StringBuilder result = new StringBuilder();
+        boolean skippedAuthor = author == null; // nothing to skip if there was no author match
+        for (String part : parts) {
+            String trimmed = part.trim();
+            if (trimmed.isEmpty()) {
+                continue;
+            }
+            if (!skippedAuthor && trimmed.equals(author)) {
+                skippedAuthor = true;
+                continue;
+            }
+            if (result.length() > 0) {
+                result.append("  •  ");
+            }
+            result.append(trimmed);
+        }
+        return result.length() > 0 ? result.toString() : null;
+    }
+
     static class ViewHolder extends RecyclerView.ViewHolder {
         final View thumbFrame;
         final ImageView thumb;
         final TextView duration;
         final TextView title;
         final TextView author;
+        final TextView meta;
 
         ViewHolder(View itemView) {
             super(itemView);
@@ -164,6 +249,7 @@ public class VideoCardAdapter extends RecyclerView.Adapter<VideoCardAdapter.View
             duration = itemView.findViewById(R.id.card_duration);
             title = itemView.findViewById(R.id.card_title);
             author = itemView.findViewById(R.id.card_author);
+            meta = itemView.findViewById(R.id.card_meta); // absent in mobile_video_row (listMode)
         }
     }
 }
