@@ -489,7 +489,8 @@
                     android:gravity="center_vertical|end"
                     android:textColor="@android:color/white"
                     android:textSize="17sp"
-                    android:maxLines="1" />
+                    android:maxLines="1"
+                    android:ellipsize="end" />
 
                 <!-- Like/dislike replace the plain stats text — tappable, count turns blue when active. -->
                 <LinearLayout

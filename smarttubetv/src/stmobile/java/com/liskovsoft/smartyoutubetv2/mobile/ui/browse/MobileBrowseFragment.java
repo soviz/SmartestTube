@@ -145,6 +145,7 @@ public class MobileBrowseFragment extends Fragment implements BrowseView, MediaS
             if (mDrawer.isDrawerOpen(GravityCompat.START)) {
                 mDrawer.closeDrawer(GravityCompat.START);
             } else {
+                closePipIfNeeded();
                 mDrawer.openDrawer(GravityCompat.START);
             }
         });

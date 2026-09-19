@@ -239,7 +239,8 @@ public class FolderCardAdapter extends RecyclerView.Adapter<FolderCardAdapter.Vi
 
         if (cover != null) {
             Glide.with(holder.itemView.getContext())
-                    .load(cover.getCardImageUrl())
+                    .load(cover.getBestCardImageUrl())
+                    .error(Glide.with(holder.itemView.getContext()).load(cover.getFallbackCardImageUrl()))
                     .into(holder.thumb);
         } else {
             Glide.with(holder.itemView.getContext()).clear(holder.thumb);

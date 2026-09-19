@@ -313,6 +313,34 @@ public final class Video {
         return altCardImageUrl != null ? altCardImageUrl : cardImageUrl;
     }
 
+    /**
+     * Same as {@link #getCardImageUrl()} but requests the full-resolution static thumbnail
+     * (maxresdefault, 1280x720) straight from i.ytimg.com by video id, instead of the small
+     * thumbnail YouTube's data response embeds for TV-sized cards (usually capped around
+     * 360x202, which is what made mobile cards look soft/blurry even after picking the
+     * largest entry from that response).
+     */
+    public String getBestCardImageUrl() {
+        if (altCardImageUrl != null) {
+            return altCardImageUrl;
+        }
+
+        if (videoId != null) {
+            return "https://i.ytimg.com/vi/" + videoId + "/maxresdefault.jpg";
+        }
+
+        return bgImageUrl != null ? bgImageUrl : cardImageUrl;
+    }
+
+    /**
+     * Fallback for {@link #getBestCardImageUrl()}: maxresdefault.jpg doesn't exist for every
+     * video (uploads that were never processed at 720p+ 404 on it), so callers should retry
+     * with this URL, which YouTube guarantees to exist, on load failure.
+     */
+    public String getFallbackCardImageUrl() {
+        return bgImageUrl != null ? bgImageUrl : cardImageUrl;
+    }
+
     public String getAuthor() {
         if (author != null && !Helpers.startsWith(author, "@")) { // not a channel handle (alias)
             return extractAuthor(author);

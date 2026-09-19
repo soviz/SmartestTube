@@ -226,7 +226,8 @@ public class VideoCardAdapter extends RecyclerView.Adapter<VideoCardAdapter.View
         }
 
         Glide.with(holder.itemView.getContext())
-                .load(video.getCardImageUrl())
+                .load(video.getBestCardImageUrl())
+                .error(Glide.with(holder.itemView.getContext()).load(video.getFallbackCardImageUrl()))
                 .into(holder.thumb);
 
         holder.itemView.setOnClickListener(v -> {

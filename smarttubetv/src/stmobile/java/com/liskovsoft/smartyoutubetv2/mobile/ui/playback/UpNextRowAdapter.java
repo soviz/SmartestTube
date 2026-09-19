@@ -99,7 +99,8 @@ public class UpNextRowAdapter extends RecyclerView.Adapter<UpNextRowAdapter.Hold
                 ? (video.getAuthor() != null ? video.getAuthor() : "") : subtitle);
 
         Glide.with(h.itemView.getContext())
-                .load(video.getCardImageUrl())
+                .load(video.getBestCardImageUrl())
+                .error(Glide.with(h.itemView.getContext()).load(video.getFallbackCardImageUrl()))
                 .into(h.thumb);
 
         // Duration/length badge overlaid on the thumbnail (matches the browse grid card).

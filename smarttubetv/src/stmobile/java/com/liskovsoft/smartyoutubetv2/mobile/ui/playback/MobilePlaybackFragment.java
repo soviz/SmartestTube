@@ -543,19 +543,30 @@ public class MobilePlaybackFragment extends PlaybackFragment {
         return true;
     }
 
-    /** Views/date: the first non-author segment of "Author • views • date". */
+    /**
+     * Views + publish date: all non-author segments of "Author • date • views"
+     * (order as produced by YouTubeHelper.createInfo), joined back with the same delimiter,
+     * e.g. "107K views • 1 month ago".
+     */
     private String extractViews(Video video) {
-        String second = Helpers.toString(video.getSecondTitle());
+        CharSequence full = video.getSecondTitleFull();
+        String second = Helpers.toString(full != null ? full : video.getSecondTitle());
         String author = video.getAuthor();
-        if (second != null) {
-            for (String segment : second.split(Video.TERTIARY_TEXT_DELIM)) {
-                segment = segment.trim();
-                if (!segment.isEmpty() && (author == null || !segment.equals(author.trim()))) {
-                    return segment;
+        if (second == null) {
+            return "";
+        }
+
+        StringBuilder result = new StringBuilder();
+        for (String segment : second.split(Video.TERTIARY_TEXT_DELIM)) {
+            segment = segment.trim();
+            if (!segment.isEmpty() && (author == null || !segment.equals(author.trim()))) {
+                if (result.length() > 0) {
+                    result.append(" ").append(Video.TERTIARY_TEXT_DELIM).append(" ");
                 }
+                result.append(segment);
             }
         }
-        return "";
+        return result.toString();
     }
 
     private void setDescriptionExpanded(boolean expanded) {
