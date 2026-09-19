@@ -137,11 +137,12 @@
 
         <!-- Phone: secondary controls dock (unused in compact mode - see VideoPlayerGlue
              #setCompactControls, kept only for the non-compact/TV action set) below the transport
-             row, above the seek bar. The fullscreen toggle (mobile_fullscreen_btn) lives in this
-             same row, end-aligned, so it's one container instead of a separately positioned
-             overlay that has to be nudged back into place whenever this row's layout changes.
-             MobilePlaybackFragment still resolves it via activity.findViewById() - id/class
-             unchanged, only its position in the tree moved. -->
+             row, above the seek bar. mobile_fullscreen_btn/time_info used to live here too, but
+             moved to fragment_playback.xml's fixed mobile_time_row (see
+             MobilePlaybackFragment#hideLegacyTransportRowParts) - this row's own position isn't
+             reliably fixed on a phone, same reason as the seek bar/transport buttons. time_info
+             is hidden (GONE) here now; its TextViews are still resolved/written by
+             PlaybackTransportRowPresenter unconditionally, hence kept in the tree. -->
         <RelativeLayout
             android:layout_width="match_parent"
             android:layout_height="@dimen/lb_control_button_height"
@@ -210,19 +211,6 @@
                         style="?attr/playbackControlsTimeStyle" />
                 </RelativeLayout>
             </RelativeLayout>
-
-            <ImageButton
-                android:id="@+id/mobile_fullscreen_btn"
-                android:layout_width="@dimen/lb_fullscreen_button_size"
-                android:layout_height="@dimen/lb_fullscreen_button_size"
-                android:layout_alignParentEnd="true"
-                android:layout_centerVertical="true"
-                android:padding="@dimen/lb_fullscreen_button_padding"
-                android:src="@drawable/ic_fullscreen_enter"
-                android:background="@android:color/transparent"
-                android:scaleType="fitCenter"
-                android:visibility="visible"
-                android:contentDescription="@string/mobile_fullscreen_toggle" />
         </RelativeLayout>
 
         <!-- Phone: seek bar last — hugs the bottom edge of the video, YouTube-style. -->

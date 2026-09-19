@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Small round thumb for the fixed-position transport bar's seek bar. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <solid android:color="#FFFF0000" />
+    <size android:width="22dp" android:height="22dp" />
+</shape>

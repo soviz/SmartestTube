@@ -92,8 +92,8 @@
     -->
     <ImageButton
         android:id="@+id/mobile_shorts_back_btn"
-        android:layout_width="48dp"
-        android:layout_height="48dp"
+        android:layout_width="58dp"
+        android:layout_height="58dp"
         android:src="@drawable/ic_shorts_back"
         android:background="@android:color/transparent"
         android:scaleType="center"
@@ -122,9 +122,9 @@
     -->
     <ImageButton
         android:id="@+id/mobile_speed_btn"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
-        android:padding="8dp"
+        android:layout_width="58dp"
+        android:layout_height="58dp"
+        android:padding="12dp"
         android:src="@drawable/action_video_speed"
         android:background="@android:color/transparent"
         android:scaleType="fitCenter"
@@ -132,13 +132,13 @@
         android:contentDescription="@string/action_video_speed"
         app:layout_constraintTop_toTopOf="@id/playback_controls_fragment"
         app:layout_constraintEnd_toStartOf="@id/mobile_overflow_btn"
-        android:layout_marginTop="8dp" />
+        android:layout_marginTop="12dp" />
 
     <ImageButton
         android:id="@+id/mobile_overflow_btn"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
-        android:padding="8dp"
+        android:layout_width="58dp"
+        android:layout_height="58dp"
+        android:padding="12dp"
         android:src="@android:drawable/ic_menu_preferences"
         android:background="@android:color/transparent"
         android:scaleType="fitCenter"
@@ -146,8 +146,153 @@
         android:contentDescription="@string/mobile_overflow_toggle"
         app:layout_constraintTop_toTopOf="@id/playback_controls_fragment"
         app:layout_constraintEnd_toEndOf="@id/playback_controls_fragment"
-        android:layout_marginTop="8dp"
-        android:layout_marginEnd="8dp" />
+        android:layout_marginTop="12dp"
+        android:layout_marginEnd="12dp" />
+
+    <!--
+        Fixed-position transport bar: seek bar + current/total time + play/pause/prev/next,
+        pinned to the actual bottom of the video strip via ConstraintLayout (same pattern as the
+        overflow/speed buttons above), replacing the equivalent content that used to live inside
+        lb_playback_transport_controls_row.xml. That row is rendered by Leanback's
+        PlaybackSupportFragment/VerticalGridView machinery, which is tuned for the TV case (a
+        controls row sitting above a shelf of related-video rows) and does not reliably pin a
+        lone row to the true bottom of the video on a phone - see
+        MobilePlaybackFragment#initFixedTransportViews/FixedTransportController for the data
+        wiring (polls VideoPlayerGlue#getControlsRow() rather than a second push-listener, since
+        PlaybackControlsRow only supports a single progress-change listener and
+        PlaybackTransportRowPresenter already owns that slot).
+        The old row's own seek bar/time/transport buttons are hidden (not removed - the row still
+        carries the title/description block) once this bar takes over; see
+        MobilePlaybackFragment#hideLegacyTransportRowParts. Compact mode only, same as the
+        overflow/speed buttons; Shorts keeps its own seek bar (setShortsChrome), so this bar stays
+        gone there.
+    -->
+    <LinearLayout
+        android:id="@+id/mobile_transport_buttons"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:visibility="gone"
+        app:layout_constraintStart_toStartOf="@id/playback_controls_fragment"
+        app:layout_constraintEnd_toEndOf="@id/playback_controls_fragment"
+        app:layout_constraintHorizontal_bias="0.5"
+        app:layout_constraintTop_toTopOf="@id/playback_controls_fragment"
+        app:layout_constraintBottom_toTopOf="@id/mobile_seek_row"
+        app:layout_constraintVertical_bias="0.5">
+
+        <ImageButton
+            android:id="@+id/mobile_prev_btn"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:padding="14dp"
+            android:src="@android:drawable/ic_media_previous"
+            android:background="@android:color/transparent"
+            android:scaleType="fitCenter"
+            android:contentDescription="@string/lb_playback_controls_skip_previous" />
+
+        <ImageButton
+            android:id="@+id/mobile_play_pause_btn"
+            android:layout_width="80dp"
+            android:layout_height="80dp"
+            android:padding="14dp"
+            android:src="@drawable/ic_shorts_pause"
+            android:background="@android:color/transparent"
+            android:scaleType="fitCenter"
+            android:contentDescription="@string/lb_playback_controls_play" />
+
+        <ImageButton
+            android:id="@+id/mobile_next_btn"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:padding="14dp"
+            android:src="@android:drawable/ic_media_next"
+            android:background="@android:color/transparent"
+            android:scaleType="fitCenter"
+            android:contentDescription="@string/lb_playback_controls_skip_next" />
+    </LinearLayout>
+
+    <!-- Fullscreen toggle: fixed above the time row, end-aligned - moved out of the Leanback row
+         (lb_playback_transport_controls_row.xml) for the same reason as the fixed seek/time/
+         transport views above: that row doesn't reliably land at a fixed screen position on a
+         phone. Its own row (not sharing mobile_time_row) so mobile_total_time can align flush
+         with the seek bar's own end edge below it. -->
+    <ImageButton
+        android:id="@+id/mobile_fullscreen_btn"
+        android:layout_width="55dp"
+        android:layout_height="55dp"
+        android:padding="7dp"
+        android:src="@drawable/ic_fullscreen_enter"
+        android:background="@android:color/transparent"
+        android:scaleType="fitCenter"
+        android:visibility="invisible"
+        android:contentDescription="@string/mobile_fullscreen_toggle"
+        app:layout_constraintEnd_toEndOf="@id/mobile_seek_row"
+        app:layout_constraintBottom_toTopOf="@id/mobile_time_row"
+        android:layout_marginEnd="0dp" />
+
+    <!-- Fixed-position time row: current time (start) / total time (end, flush with the seek
+         bar's own end edge below it) directly above the seek bar, which is the last element and
+         hugs the actual bottom edge of the video strip. -->
+    <RelativeLayout
+        android:id="@+id/mobile_time_row"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layoutDirection="ltr"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
+        android:visibility="gone"
+        app:layout_constraintStart_toStartOf="@id/mobile_seek_row"
+        app:layout_constraintEnd_toEndOf="@id/mobile_seek_row"
+        app:layout_constraintBottom_toTopOf="@id/mobile_seek_row">
+
+        <TextView
+            android:id="@+id/mobile_current_time"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentStart="true"
+            android:textColor="@android:color/white"
+            android:textSize="14sp"
+            android:shadowColor="#CC000000"
+            android:shadowRadius="3"
+            android:text="0:00" />
+
+        <TextView
+            android:id="@+id/mobile_total_time"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentEnd="true"
+            android:textColor="@android:color/white"
+            android:textSize="14sp"
+            android:shadowColor="#CC000000"
+            android:shadowRadius="3"
+            android:text="0:00" />
+    </RelativeLayout>
+
+    <RelativeLayout
+        android:id="@+id/mobile_seek_row"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        app:layout_constraintStart_toStartOf="@id/playback_controls_fragment"
+        app:layout_constraintEnd_toEndOf="@id/playback_controls_fragment"
+        app:layout_constraintBottom_toBottomOf="@id/playback_controls_fragment"
+        android:layout_marginBottom="2dp">
+
+        <SeekBar
+            android:id="@+id/mobile_seek_bar"
+            android:layout_width="match_parent"
+            android:layout_height="32dp"
+            android:layout_centerVertical="true"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:paddingTop="0dp"
+            android:paddingBottom="0dp"
+            android:max="1000"
+            android:progressDrawable="@drawable/mobile_seek_bar_progress"
+            android:thumb="@drawable/mobile_seek_bar_thumb"
+            android:thumbOffset="0dp" />
+    </RelativeLayout>
 
     <!--
         Shorts overlay: centred play/pause indicator (not interactive — tap-anywhere logic in

@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Fixed-position transport bar's seek bar drawable (android.widget.SeekBar, not the custom
+    Leanback SeekBar - see fragment_playback.xml's mobile_seek_bar comment). Mirrors the Leanback
+    row's own progress/secondary-progress/background colors (styles.xml's playbackProgressColor
+    attrs -> @color/red / @color/light_red for the default theme), hardcoded here since those
+    color tokens live outside this module's own values files.
+
+    Follows the AOSP progress_horizontal_material.xml pattern (scale + explicit shape height +
+    center_vertical|fill_horizontal gravity) rather than clip+inset: an inset wrapped around a
+    clip collapses to zero height on some SeekBar implementations since the clip's own level
+    isn't applied until a progress value is set, and inset alone doesn't give it an intrinsic
+    size to clip from.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:id="@android:id/background"
+          android:gravity="center_vertical|fill_horizontal">
+        <shape android:shape="rectangle">
+            <corners android:radius="1.5dp" />
+            <size android:height="3dp" />
+            <solid android:color="#4DFFFFFF" />
+        </shape>
+    </item>
+    <item android:id="@android:id/secondaryProgress"
+          android:gravity="center_vertical|fill_horizontal">
+        <scale android:scaleWidth="100%">
+            <shape android:shape="rectangle">
+                <corners android:radius="1.5dp" />
+                <size android:height="3dp" />
+                <solid android:color="#80FFFFFF" />
+            </shape>
+        </scale>
+    </item>
+    <item android:id="@android:id/progress"
+          android:gravity="center_vertical|fill_horizontal">
+        <scale android:scaleWidth="100%">
+            <shape android:shape="rectangle">
+                <corners android:radius="1.5dp" />
+                <size android:height="3dp" />
+                <solid android:color="#FFFF0000" />
+            </shape>
+        </scale>
+    </item>
+</layer-list>

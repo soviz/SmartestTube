@@ -109,6 +109,15 @@ public class MobilePlaybackFragment extends PlaybackFragment {
     private boolean mWindowedSwipeTracking;
     private boolean mWindowedSwipeTriggered;
 
+    // Tap-to-hide tracking (non-Shorts, overlay-already-shown case only — see
+    // handleOverlayTapToggle()): a genuine tap (small movement, on empty video, not on any fixed
+    // control) toggles the overlay off, mirroring the official YouTube app. Tap-to-SHOW already
+    // works via interceptPlayerTouch()'s isOverlayShown() branch below, which just tickles
+    // Leanback; this is the missing other half.
+    private float mOverlayTapDownX;
+    private float mOverlayTapDownY;
+    private boolean mOverlayTapCandidate;
+
     // Shorts-specific chrome (action rail + back button + info bar below video).
     private View mShortsActionRail;
     private ImageButton mShortsBackBtn;
@@ -118,6 +127,23 @@ public class MobilePlaybackFragment extends PlaybackFragment {
     /** Open overflow (gear) popup, if any - dismissed when the controls overlay hides (see
      *  {@link #hideControlsOverlay}) so it never lingers over a faded/gone player. */
     private android.widget.PopupMenu mOverflowPopup;
+
+    // Fixed-position transport bar (seek bar + time + play/pause/prev/next) - replaces the
+    // equivalent content of the Leanback transport row on phone, which doesn't reliably pin to
+    // the true bottom of the video (see fragment_playback.xml's mobile_seek_row comment and
+    // FixedTransportController below). Compact mode only, same as mOverflowBtn/mSpeedBtn; never
+    // shown in Shorts (state 2), which drives its own seek bar via setShortsChrome.
+    private View mFixedTransportButtons;
+    private View mFixedTimeRow;
+    private View mFixedSeekRow;
+    private ImageButton mFixedPrevBtn;
+    private ImageButton mFixedPlayPauseBtn;
+    private ImageButton mFixedNextBtn;
+    private TextView mFixedCurrentTime;
+    private TextView mFixedTotalTime;
+    private android.widget.SeekBar mFixedSeekBar;
+    private FixedTransportController mFixedTransportController;
+
     private LinearLayout mShortsInfoBar;
     private TextView mShortsTitleView;
     private TextView mShortsChannelView;
@@ -236,6 +262,7 @@ public class MobilePlaybackFragment extends PlaybackFragment {
         mChromeHandler.removeCallbacks(mShortsLoopTimeout);
         mAwaitingShortsFrame = false;
         mAwaitingShortsLoop = false;
+        if (mFixedTransportController != null) mFixedTransportController.stop();
     }
 
     @Override
@@ -647,11 +674,72 @@ public class MobilePlaybackFragment extends PlaybackFragment {
             return true;
         }
 
-        // Non-Shorts: original phantom-tap guard.
-        if (isOverlayShown()) return false;
+        // Non-Shorts, overlay already shown: tap-to-HIDE (tap-to-SHOW is the branch below this
+        // one). A tap that doesn't land on a fixed control toggles the overlay off, mirroring
+        // the official YouTube app - see handleOverlayTapToggle().
+        if (isOverlayShown()) {
+            return handleOverlayTapToggle(event, playerView);
+        }
         if (event.getY() > playerView.getBottom()) return false;
         onDispatchTouchEvent(event); // overlay tickle + double-tap seek
         return true;
+    }
+
+    /**
+     * Tap-to-hide for the controls overlay: mirrors interceptPlayerTouch()'s tap-to-SHOW branch
+     * (isOverlayShown()==false -> onDispatchTouchEvent() ticks Leanback back on), which is the
+     * only direction Leanback's own touch handling provides - it has no equivalent "tap while
+     * shown to hide" gesture. Consumes only a genuine tap (small movement, short duration) that
+     * doesn't land on a fixed control (buttons, seek bar) or the below-video panel; anything else
+     * (drags, taps on controls) falls through to normal dispatch untouched, since returning false
+     * here doesn't consume the event.
+     */
+    private boolean handleOverlayTapToggle(MotionEvent event, View playerView) {
+        switch (event.getActionMasked()) {
+            case MotionEvent.ACTION_DOWN:
+                mOverlayTapCandidate = event.getY() <= playerView.getBottom()
+                        && !isTouchOnSeekBar(event)
+                        && !touchHitsFixedControl(event.getRawX(), event.getRawY());
+                mOverlayTapDownX = event.getRawX();
+                mOverlayTapDownY = event.getRawY();
+                return false; // let the down-event fall through to buttons/seek bar too
+            case MotionEvent.ACTION_MOVE:
+                if (mOverlayTapCandidate) {
+                    int slop = ViewConfiguration.get(playerView.getContext()).getScaledTouchSlop();
+                    float dx = event.getRawX() - mOverlayTapDownX;
+                    float dy = event.getRawY() - mOverlayTapDownY;
+                    if (Math.abs(dx) > slop || Math.abs(dy) > slop) {
+                        mOverlayTapCandidate = false; // turned into a drag/scrub, not a tap
+                    }
+                }
+                return false;
+            case MotionEvent.ACTION_UP:
+                boolean wasCandidate = mOverlayTapCandidate;
+                mOverlayTapCandidate = false;
+                if (wasCandidate) {
+                    hideControlsOverlay(true);
+                    return true; // consume - this tap toggled the overlay, not a click-through
+                }
+                return false;
+            case MotionEvent.ACTION_CANCEL:
+                mOverlayTapCandidate = false;
+                return false;
+            default:
+                return false;
+        }
+    }
+
+    /** True when the touch's raw coordinates land on any of the fixed-position player controls
+     *  (transport buttons, fullscreen, overflow/speed, seek bar) - a tap there must reach the
+     *  control itself, never be swallowed as an overlay-hide tap. */
+    private boolean touchHitsFixedControl(float rawX, float rawY) {
+        return viewContainsRaw(mFixedTransportButtons, rawX, rawY)
+            || viewContainsRaw(mFixedTimeRow, rawX, rawY)
+            || viewContainsRaw(mFixedSeekRow, rawX, rawY)
+            || viewContainsRaw(mFullscreenBtn, rawX, rawY)
+            || viewContainsRaw(mOverflowBtn, rawX, rawY)
+            || viewContainsRaw(mSpeedBtn, rawX, rawY)
+            || viewContainsRaw(mShortsBackBtn, rawX, rawY);
     }
 
     /**
@@ -702,17 +790,18 @@ public class MobilePlaybackFragment extends PlaybackFragment {
      * True when the touch's raw coordinates land on (or just above/below, for a comfortable
      * grab area) the seek bar, so a scrub drag that wobbles vertically past the swipe slop is
      * never misread as swipe-to-minimize. Uses raw screen coordinates via getLocationOnScreen()
-     * so it lines up with the raw deltas handleWindowedSwipeEvent() tracks.
+     * so it lines up with the raw deltas handleWindowedSwipeEvent() tracks. Checks the fixed
+     * mobile_seek_bar (fragment_playback.xml), not the legacy Leanback playback_progress bar -
+     * the latter is hidden (GONE) once the fixed transport bar takes over, see
+     * hideLegacyTransportRowParts().
      */
     private boolean isTouchOnSeekBar(MotionEvent event) {
-        View root = getView();
-        if (root == null) return false;
-        View seekBar = root.findViewById(R.id.playback_progress);
+        View seekBar = mFixedSeekBar;
         if (seekBar == null || seekBar.getVisibility() != View.VISIBLE) return false;
 
         int[] location = new int[2];
         seekBar.getLocationOnScreen(location);
-        int touchPaddingPx = (int) (24 * root.getResources().getDisplayMetrics().density);
+        int touchPaddingPx = (int) (24 * seekBar.getResources().getDisplayMetrics().density);
         Rect hitRect = new Rect(
                 location[0],
                 location[1] - touchPaddingPx,
@@ -931,6 +1020,11 @@ public class MobilePlaybackFragment extends PlaybackFragment {
         // may have left it INVISIBLE). In Shorts, setShortsChrome owns the control row.
         if (layoutState != 2) setShortsControlsVisible(true);
 
+        // Entering Shorts: the fixed transport bar isn't used there (Shorts drives its own seek
+        // bar via setShortsChrome) - make sure a bar left visible from a prior non-Shorts session
+        // doesn't linger, and stop its poll loop.
+        if (layoutState == 2) applyFixedTransportVisibility(false);
+
         // Shorts shows only the seek bar over full-bleed video — kill the Leanback dim scrim
         // (BG_LIGHT, set at fragment creation) so the video isn't darkened. Restore it for
         // regular/full-screen playback.
@@ -958,10 +1052,10 @@ public class MobilePlaybackFragment extends PlaybackFragment {
         // Non-Shorts: ensure the control row is visible after the lazy inflate. In Shorts the
         // control row (transport buttons + seek bar + time) is owned by setShortsChrome.
         if (mLayoutState != 2) setShortsControlsVisible(true);
-        // mobile_fullscreen_btn now lives inside the Leanback secondary-controls row
-        // (lb_playback_transport_controls_row.xml), which is itself lazily inflated on first
-        // reveal — initPanelViews()'s one-shot lookup can run before that row exists, so
-        // re-resolve it here (after the lazy inflate) if it's still unbound.
+        // mobile_fullscreen_btn lives in fragment_playback.xml's fixed mobile_time_row now (not
+        // the lazily-inflated Leanback row), so initPanelViews() already binds it on fragment
+        // creation. This is just a defensive re-resolve in case that first lookup ran before
+        // mRoot was ready.
         if (mFullscreenBtn == null) {
             Activity activity = getActivity();
             if (activity != null) {
@@ -1003,6 +1097,14 @@ public class MobilePlaybackFragment extends PlaybackFragment {
             VideoPlayerGlue glue = getPlayerGlue();
             mSpeedBtn.setVisibility(glue != null && glue.getSpeedAction() != null ? View.VISIBLE : View.GONE);
         }
+        // Fixed transport bar follows the same reveal, non-Shorts only - see
+        // applyFixedTransportVisibility's javadoc. The legacy row's own seek bar/transport
+        // buttons are collapsed every reveal too, since they're lazily (re)inflated the same way
+        // mFullscreenBtn is above and could otherwise pop back to VISIBLE.
+        if (mLayoutState != 2) {
+            hideLegacyTransportRowParts();
+            applyFixedTransportVisibility(true);
+        }
     }
 
     @Override
@@ -1017,6 +1119,7 @@ public class MobilePlaybackFragment extends PlaybackFragment {
         if (mFullscreenBtn != null) mFullscreenBtn.setVisibility(View.INVISIBLE);
         if (mOverflowBtn != null) mOverflowBtn.setVisibility(View.INVISIBLE);
         if (mSpeedBtn != null) mSpeedBtn.setVisibility(View.INVISIBLE);
+        applyFixedTransportVisibility(false);
         super.hideControlsOverlay(runAnimation);
     }
 
@@ -1645,7 +1748,15 @@ public class MobilePlaybackFragment extends PlaybackFragment {
         }
     }
 
-    /** Dedicated video-speed button: runs the action through the normal click path. */
+    /**
+     * Dedicated video-speed button: always opens the speed-picker dialog (the TV remote's
+     * long-click path), not the short-click's silent 1.0x/last-speed toggle - see
+     * VideoStateController#onSpeedClicked/onSpeedLongClicked in the common module. On a phone
+     * there's no separate long-press gesture for this dedicated button, and a toggle with no
+     * visible feedback reads as "the button doesn't do anything," so it always goes through
+     * onActionLongClicked (VideoPlayerGlue#onActionLongClicked -> onButtonLongClicked ->
+     * onSpeedLongClicked) instead of performOverflowAction's short-click path.
+     */
     private void onSpeedBtnClicked(View v) {
         VideoPlayerGlue glue = getPlayerGlue();
         if (glue == null) {
@@ -1653,7 +1764,7 @@ public class MobilePlaybackFragment extends PlaybackFragment {
         }
         androidx.leanback.widget.Action action = glue.getSpeedAction();
         if (action != null) {
-            glue.performOverflowAction(action);
+            glue.onActionLongClicked(action);
         }
     }
 
@@ -1906,6 +2017,8 @@ public class MobilePlaybackFragment extends PlaybackFragment {
             mSpeedBtn.setOnClickListener(this::onSpeedBtnClicked);
         }
 
+        initFixedTransportViews(activity);
+
         // Centred play/pause indicator (ImageView — visual only, not tappable directly).
         mShortsPlayPauseBtn = activity.findViewById(R.id.mobile_shorts_play_pause_btn);
 
@@ -1973,5 +2086,226 @@ public class MobilePlaybackFragment extends PlaybackFragment {
             mShortsPlayPauseBtn,
             mShortsInfoBar
         };
+    }
+
+    /**
+     * Resolves the fixed-position transport bar's views (see fragment_playback.xml's
+     * mobile_transport_buttons/mobile_time_row/mobile_seek_row) and wires the transport buttons
+     * and seek bar to the same action paths the old Leanback row used - VideoPlayerGlue's
+     * togglePlayback/next/previous for the buttons (the identical dispatch
+     * showOverflowMenu/onSpeedBtnClicked already use) and PlaybackFragment's own
+     * getPositionMs/setPositionMs/getDurationMs for the seek bar (the same ExoPlayerController
+     * state the Leanback row's PlayerAdapter itself reads from - see FixedTransportController).
+     */
+    private void initFixedTransportViews(Activity activity) {
+        mFixedTransportButtons = activity.findViewById(R.id.mobile_transport_buttons);
+        mFixedTimeRow = activity.findViewById(R.id.mobile_time_row);
+        mFixedSeekRow = activity.findViewById(R.id.mobile_seek_row);
+        mFixedPrevBtn = activity.findViewById(R.id.mobile_prev_btn);
+        mFixedPlayPauseBtn = activity.findViewById(R.id.mobile_play_pause_btn);
+        mFixedNextBtn = activity.findViewById(R.id.mobile_next_btn);
+        mFixedCurrentTime = activity.findViewById(R.id.mobile_current_time);
+        mFixedTotalTime = activity.findViewById(R.id.mobile_total_time);
+        mFixedSeekBar = activity.findViewById(R.id.mobile_seek_bar);
+
+        if (mFixedPrevBtn != null) {
+            mFixedPrevBtn.setOnClickListener(v -> {
+                VideoPlayerGlue glue = getPlayerGlue();
+                if (glue != null) glue.previous();
+            });
+        }
+        if (mFixedPlayPauseBtn != null) {
+            mFixedPlayPauseBtn.setOnClickListener(v -> {
+                VideoPlayerGlue glue = getPlayerGlue();
+                if (glue != null) glue.togglePlayback();
+                syncFixedPlayPauseIcon();
+            });
+        }
+        if (mFixedNextBtn != null) {
+            mFixedNextBtn.setOnClickListener(v -> {
+                VideoPlayerGlue glue = getPlayerGlue();
+                if (glue != null) glue.next();
+            });
+        }
+
+        if (mFixedSeekBar != null) {
+            mFixedTransportController = new FixedTransportController();
+            mFixedSeekBar.setOnSeekBarChangeListener(mFixedTransportController);
+        }
+    }
+
+    /** Reflects the real player state onto the fixed play/pause button's icon. */
+    private void syncFixedPlayPauseIcon() {
+        if (mFixedPlayPauseBtn == null) {
+            return;
+        }
+        mFixedPlayPauseBtn.setImageResource(isPlaying() ? R.drawable.ic_shorts_pause : R.drawable.ic_shorts_play);
+    }
+
+    /**
+     * Shows/hides the fixed transport bar together with the Leanback controls overlay, and hides
+     * the equivalent parts of the old Leanback transport row (seek bar/time/transport buttons)
+     * that this bar now replaces - the row's title/description block and thumbs-preview stay, so
+     * the row itself is not removed, only these children collapse to nothing (see
+     * lb_playback_transport_controls_row.xml: android:id/transport_row's controls_dock,
+     * secondary time_info block already hidden further above; this only touches the parts still
+     * visible there: playback_progress and the play/pause/prev/next controls_dock content).
+     * Compact mode + non-Shorts only - Shorts keeps the Leanback row's own seek bar via
+     * setShortsChrome, and landscape/tablet full control sets are unaffected (this bar is gone
+     * there, see applyFixedTransportVisibility's compact check).
+     */
+    private void applyFixedTransportVisibility(boolean visible) {
+        int vis = visible ? View.VISIBLE : View.INVISIBLE;
+        if (mFixedTransportButtons != null) mFixedTransportButtons.setVisibility(vis);
+        if (mFixedTimeRow != null) mFixedTimeRow.setVisibility(vis);
+        if (mFixedSeekRow != null) mFixedSeekRow.setVisibility(vis);
+
+        if (visible) {
+            syncFixedPlayPauseIcon();
+            if (mFixedTransportController != null) mFixedTransportController.start();
+        } else if (mFixedTransportController != null) {
+            mFixedTransportController.stop();
+        }
+    }
+
+    /**
+     * Hides the parts of the old Leanback transport row now duplicated by the fixed bar: the
+     * seek bar itself and the primary controls dock (play/pause/prev/next). The row's title/
+     * description block (controls_card/description_dock) and thumbs-preview wrapper are left
+     * alone - they still belong to the row. GONE, not INVISIBLE: unlike the row's own time_info
+     * (kept at 0dp/0dp in the XML so PlaybackTransportRowPresenter can keep writing to those
+     * TextViews unconditionally), playback_progress/controls_dock are read by nothing once
+     * hidden, and GONE also reclaims their layout space so the row doesn't leave a dead gap
+     * above the fixed bar.
+     */
+    private void hideLegacyTransportRowParts() {
+        View root = getView();
+        if (root == null) {
+            return;
+        }
+        View seekBar = root.findViewById(R.id.playback_progress);
+        if (seekBar != null) seekBar.setVisibility(View.GONE);
+        View controlsDock = root.findViewById(R.id.controls_dock);
+        if (controlsDock != null) controlsDock.setVisibility(View.GONE);
+        View timeInfo = root.findViewById(R.id.time_info);
+        if (timeInfo != null) timeInfo.setVisibility(View.GONE);
+    }
+
+    /**
+     * Drives the fixed transport bar's seek bar + time labels from the same ExoPlayerController
+     * state the Leanback row's own PlayerAdapter reads from (PlaybackFragment#getPositionMs/
+     * getDurationMs/getPlayWhenReady - see class javadoc on initFixedTransportViews). Polls on a
+     * short interval instead of hooking PlaybackControlsRow#setOnPlaybackProgressChangedListener,
+     * because that listener is single-slot and already owned by PlaybackTransportRowPresenter's
+     * ViewHolder (installed in onBindRowViewHolder/torn down in onUnbindRowViewHolder) - a second
+     * caller would silently steal the row's only callback instead of adding a second one.
+     */
+    private final class FixedTransportController implements android.widget.SeekBar.OnSeekBarChangeListener {
+        private static final int POLL_MS = 250;
+        private final Handler mHandler = new Handler();
+        private boolean mUserDragging;
+        private boolean mWasPlayingBeforeDrag;
+        private boolean mRunning;
+
+        private final Runnable mPoll = new Runnable() {
+            @Override
+            public void run() {
+                if (!mRunning) {
+                    return;
+                }
+                tick();
+                mHandler.postDelayed(this, POLL_MS);
+            }
+        };
+
+        void start() {
+            if (mRunning) {
+                return;
+            }
+            mRunning = true;
+            tick();
+            mHandler.postDelayed(mPoll, POLL_MS);
+        }
+
+        void stop() {
+            mRunning = false;
+            mHandler.removeCallbacks(mPoll);
+        }
+
+        private void tick() {
+            if (mUserDragging || mFixedSeekBar == null) {
+                return;
+            }
+            long durationMs = getDurationMs();
+            long positionMs = getPositionMs();
+            if (durationMs <= 0) {
+                return;
+            }
+            mFixedSeekBar.setMax(1000);
+            mFixedSeekBar.setProgress((int) Math.round(positionMs * 1000.0 / durationMs));
+
+            VideoPlayerGlue glue = getPlayerGlue();
+            if (glue != null && glue.getControlsRow() != null) {
+                long bufferedMs = glue.getControlsRow().getBufferedPosition();
+                mFixedSeekBar.setSecondaryProgress((int) Math.round(bufferedMs * 1000.0 / durationMs));
+            }
+
+            if (mFixedCurrentTime != null) mFixedCurrentTime.setText(formatFixedTime(positionMs));
+            if (mFixedTotalTime != null) mFixedTotalTime.setText(formatFixedTime(durationMs));
+
+            syncFixedPlayPauseIcon();
+        }
+
+        @Override
+        public void onProgressChanged(android.widget.SeekBar seekBar, int progress, boolean fromUser) {
+            if (!fromUser) {
+                return;
+            }
+            long durationMs = getDurationMs();
+            if (durationMs <= 0) {
+                return;
+            }
+            long targetMs = Math.round(progress * durationMs / 1000.0);
+            if (mFixedCurrentTime != null) mFixedCurrentTime.setText(formatFixedTime(targetMs));
+        }
+
+        @Override
+        public void onStartTrackingTouch(android.widget.SeekBar seekBar) {
+            mUserDragging = true;
+            // Mirror the Leanback row's own seek gesture: pause for the duration of the scrub, so
+            // the position doesn't keep advancing under the user's thumb (PlaybackTransportControlGlue
+            // does the same in PlaybackSeekUi.Client#onSeekStarted).
+            mWasPlayingBeforeDrag = isPlaying();
+            if (mWasPlayingBeforeDrag) {
+                setPlayWhenReady(false);
+            }
+        }
+
+        @Override
+        public void onStopTrackingTouch(android.widget.SeekBar seekBar) {
+            mUserDragging = false;
+            long durationMs = getDurationMs();
+            if (durationMs > 0) {
+                long targetMs = Math.round(seekBar.getProgress() * durationMs / 1000.0);
+                setPositionMs(targetMs);
+            }
+            if (mWasPlayingBeforeDrag) {
+                setPlayWhenReady(true);
+            }
+        }
+    }
+
+    /** mm:ss / h:mm:ss formatting for the fixed transport bar's time labels. */
+    private String formatFixedTime(long ms) {
+        if (ms < 0) {
+            return "--";
+        }
+        long totalSeconds = ms / 1000;
+        long hours = totalSeconds / 3600;
+        long minutes = (totalSeconds % 3600) / 60;
+        long seconds = totalSeconds % 60;
+        return hours > 0
+                ? String.format(java.util.Locale.getDefault(), "%d:%02d:%02d", hours, minutes, seconds)
+                : String.format(java.util.Locale.getDefault(), "%d:%02d", minutes, seconds);
     }
 }
