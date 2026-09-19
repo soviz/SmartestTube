@@ -26,7 +26,7 @@ import com.liskovsoft.smartyoutubetv2.tv.R;
 /**
  * Native portrait Channel-uploads screen. Implements {@link ChannelUploadsView} and is
  * driven by the existing {@link ChannelUploadsPresenter} unchanged. One continuous
- * 2-column grid of videos with scroll-to-bottom pagination — no shelves (the upstream
+ * full-width column of videos with scroll-to-bottom pagination — no shelves (the upstream
  * model is a single uploads stream, not multiple rows).
  */
 public class MobileChannelUploadsFragment extends Fragment implements ChannelUploadsView {
@@ -61,8 +61,10 @@ public class MobileChannelUploadsFragment extends Fragment implements ChannelUpl
             }
         });
 
-        int span = getResources().getInteger(R.integer.mobile_grid_span);
-        int cardWidth = getResources().getDisplayMetrics().widthPixels / span;
+        // Single full-width column, like Home/Subscriptions on the main screen, instead of
+        // a multi-column grid.
+        int span = 1;
+        int cardWidth = getResources().getDisplayMetrics().widthPixels;
         mAdapter = new VideoCardAdapter(cardWidth, mVideoClick, mVideoLongClick);
         mGrid.setLayoutManager(new GridLayoutManager(getContext(), span));
         mGrid.setAdapter(mAdapter);
@@ -156,16 +158,13 @@ public class MobileChannelUploadsFragment extends Fragment implements ChannelUpl
     // ----- callbacks -----
 
     // Hosting activity declares configChanges="orientation|..." so it is NOT recreated on
-    // rotation; re-read the grid span (values-sw600dp-land widens it) and resize cards.
+    // rotation; re-read the screen width and resize cards (span stays 1: single full-width
+    // column).
     @Override
     public void onConfigurationChanged(@NonNull Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
-        int span = getResources().getInteger(R.integer.mobile_grid_span);
-        if (mGrid != null && mGrid.getLayoutManager() instanceof GridLayoutManager) {
-            ((GridLayoutManager) mGrid.getLayoutManager()).setSpanCount(span);
-        }
         if (mAdapter != null) {
-            mAdapter.setCardWidth(getResources().getDisplayMetrics().widthPixels / span);
+            mAdapter.setCardWidth(getResources().getDisplayMetrics().widthPixels);
         }
     }
 

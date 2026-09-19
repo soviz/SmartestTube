@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.content.res.Configuration;
+import android.graphics.Rect;
 import android.os.Build.VERSION;
 import android.os.Build.VERSION_CODES;
 import android.os.Handler;
@@ -631,11 +632,11 @@ public class MobilePlaybackFragment extends PlaybackFragment {
         // Landscape full-screen: swipe-down-to-minimize is off (only the portrait strip has it) —
         // a vertical drag there is easy to trigger by accident while reaching for the seek bar
         // or transport controls on a wide screen.
-        // Also off while the controls overlay (seek bar) is shown, otherwise a finger dragging
-        // the seek bar thumb that wobbles vertically past the slop gets misread as a swipe-to-
-        // minimize gesture and every following ACTION_MOVE is swallowed here instead of reaching
-        // the seek bar, breaking the drag almost as soon as it starts.
-        if (mLayoutState != 0 && !isOverlayShown() && handleWindowedSwipeEvent(event, playerView)) {
+        // Works even while the controls overlay is shown (matches the official YouTube app), but
+        // handleWindowedSwipeEvent() itself refuses to start tracking a drag whose ACTION_DOWN
+        // landed on the seek bar (see isTouchOnSeekBar()), so dragging the scrubber thumb is never
+        // misread as swipe-to-minimize.
+        if (mLayoutState != 0 && handleWindowedSwipeEvent(event, playerView)) {
             return true;
         }
 
@@ -657,7 +658,8 @@ public class MobilePlaybackFragment extends PlaybackFragment {
     private boolean handleWindowedSwipeEvent(MotionEvent event, View playerView) {
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
-                mWindowedSwipeTracking = event.getY() <= playerView.getBottom();
+                mWindowedSwipeTracking = event.getY() <= playerView.getBottom()
+                        && !isTouchOnSeekBar(event);
                 mWindowedSwipeTriggered = false;
                 mWindowedSwipeStartX = event.getRawX();
                 mWindowedSwipeStartY = event.getRawY();
@@ -687,6 +689,30 @@ public class MobilePlaybackFragment extends PlaybackFragment {
             default:
                 return false;
         }
+    }
+
+    /**
+     * True when the touch's raw coordinates land on (or just above/below, for a comfortable
+     * grab area) the seek bar, so a scrub drag that wobbles vertically past the swipe slop is
+     * never misread as swipe-to-minimize. Uses raw screen coordinates via getLocationOnScreen()
+     * so it lines up with the raw deltas handleWindowedSwipeEvent() tracks.
+     */
+    private boolean isTouchOnSeekBar(MotionEvent event) {
+        View root = getView();
+        if (root == null) return false;
+        View seekBar = root.findViewById(R.id.playback_progress);
+        if (seekBar == null || seekBar.getVisibility() != View.VISIBLE) return false;
+
+        int[] location = new int[2];
+        seekBar.getLocationOnScreen(location);
+        int touchPaddingPx = (int) (24 * root.getResources().getDisplayMetrics().density);
+        Rect hitRect = new Rect(
+                location[0],
+                location[1] - touchPaddingPx,
+                location[0] + seekBar.getWidth(),
+                location[1] + seekBar.getHeight() + touchPaddingPx);
+
+        return hitRect.contains((int) event.getRawX(), (int) event.getRawY());
     }
 
     private boolean handleShortsTouchEvent(MotionEvent event) {

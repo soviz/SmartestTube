@@ -18,7 +18,7 @@ import java.util.List;
 
 /**
  * ViewPager2 adapter that turns the channel's emitted {@link VideoGroup}s into swipeable
- * tabs — each page is a vertical 2-column grid of one group's videos (the same grid the
+ * tabs — each page is a single full-width column of one group's videos (the same layout the
  * Channel-uploads screen uses). Upstream already delivers the channel's content tabs
  * (Videos / Shorts / Live / Playlists …) as separate groups, so a tab is simply a group.
  *

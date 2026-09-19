@@ -44,7 +44,7 @@ import io.reactivex.disposables.Disposable;
  * and the menu dialog all flow through the presenter.
  *
  * Each content group the presenter emits (Videos / Shorts / Live / Playlists …) becomes a
- * tab: a {@link ViewPager2} page showing that group as a 2-column grid, with a Material
+ * tab: a {@link ViewPager2} page showing that group as a single full-width column, with a Material
  * {@link TabLayout} strip linked by {@link TabLayoutMediator}. Per-tab pagination routes
  * back through {@code presenter.onScrollEnd}; see {@link ChannelTabsAdapter}.
  */
@@ -98,8 +98,10 @@ public class MobileChannelFragment extends Fragment implements ChannelView {
             }
         });
 
-        int span = getResources().getInteger(R.integer.mobile_grid_span);
-        int cardWidth = getResources().getDisplayMetrics().widthPixels / span;
+        // Single full-width column, like Home/Subscriptions on the main screen, instead of
+        // a multi-column grid.
+        int span = 1;
+        int cardWidth = getResources().getDisplayMetrics().widthPixels;
         mTabsAdapter = new ChannelTabsAdapter(cardWidth, span, mVideoClick, mVideoLongClick,
                 last -> {
                     if (mPresenter != null && last != null) {

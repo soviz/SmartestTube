@@ -658,9 +658,10 @@ public class MobileBrowseFragment extends Fragment implements BrowseView, MediaS
             mContentList.addOnScrollListener(mFolderScrollListener);
             mGenres = new ArrayList<>();
             mSelectedGenre = null;
-        } else if (type == BrowseSection.TYPE_ROW && section.getId() == MediaGroup.TYPE_HOME) {
-            // Home ("Recommended"): a single full-width column instead of horizontal
-            // shelves-per-topic, with lazy-load-on-scroll like the other grid sections
+        } else if (type == BrowseSection.TYPE_ROW
+                && (section.getId() == MediaGroup.TYPE_HOME || section.getId() == MediaGroup.TYPE_SUBSCRIPTIONS)) {
+            // Home ("Recommended") and Subscriptions: a single full-width column instead of
+            // horizontal shelves-per-topic, with lazy-load-on-scroll like the other grid sections
             // (span 1, so each card fills the screen width).
             mGridAdapter = new VideoCardAdapter(screenWidthPx(), mVideoClick, mVideoLongClick);
             mShelfAdapter = null;

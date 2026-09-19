@@ -14,7 +14,9 @@ import com.liskovsoft.smartyoutubetv2.common.app.models.data.Video;
 import com.liskovsoft.smartyoutubetv2.tv.R;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Flat list of video cards. Used both for grid sections and (horizontally) inside shelves.
@@ -32,6 +34,10 @@ public class VideoCardAdapter extends RecyclerView.Adapter<VideoCardAdapter.View
     private final OnVideoAction mClick;
     private final OnVideoAction mLongClick;
     private final List<Video> mVideos = new ArrayList<>();
+    // Home/Subscriptions/etc. can hand back the same video across separate continuation
+    // pages (upstream feed quirk); track already-shown ids so re-appending the same
+    // video doesn't render a visible duplicate card.
+    private final Set<String> mVideoIds = new HashSet<>();
 
     public VideoCardAdapter(int cardWidth, OnVideoAction click, OnVideoAction longClick) {
         this(cardWidth, false, click, longClick);
@@ -64,8 +70,11 @@ public class VideoCardAdapter extends RecyclerView.Adapter<VideoCardAdapter.View
 
     public void setVideos(List<Video> videos) {
         mVideos.clear();
+        mVideoIds.clear();
         if (videos != null) {
-            mVideos.addAll(videos);
+            for (Video video : videos) {
+                addIfNew(video);
+            }
         }
         notifyDataSetChanged();
     }
@@ -81,17 +90,46 @@ public class VideoCardAdapter extends RecyclerView.Adapter<VideoCardAdapter.View
             return;
         }
         int start = mVideos.size();
-        mVideos.addAll(videos);
-        notifyItemRangeInserted(start, videos.size());
+        int added = 0;
+        for (Video video : videos) {
+            if (addIfNew(video)) {
+                added++;
+            }
+        }
+        if (added > 0) {
+            notifyItemRangeInserted(start, added);
+        }
+    }
+
+    /**
+     * @return true if the video's id was not already shown and it was added to the list.
+     * Videos without an id (e.g. section placeholders) are always added, since there's
+     * nothing to dedupe them by.
+     */
+    private boolean addIfNew(Video video) {
+        if (video == null) {
+            return false;
+        }
+        if (video.videoId != null && !mVideoIds.add(video.videoId)) {
+            return false;
+        }
+        mVideos.add(video);
+        return true;
     }
 
     public void clear() {
         mVideos.clear();
+        mVideoIds.clear();
         notifyDataSetChanged();
     }
 
     public void remove(List<Video> videos) {
         if (videos != null && mVideos.removeAll(videos)) {
+            for (Video video : videos) {
+                if (video != null && video.videoId != null) {
+                    mVideoIds.remove(video.videoId);
+                }
+            }
             notifyDataSetChanged();
         }
     }
