@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    stmobile override of the Leanback details description block (video title/subtitle/body
+    above the player controls). Phone: the subtitle line (channel/views/date/likes/dislikes/
+    subscribers) collapses to a single overlong line on a narrow screen and clutters the video,
+    so it's removed here - only the title (already shrunk via lb_details_description_title_text_size
+    in dimens.xml) and body remain. Ids kept - resolved by AbstractDetailsDescriptionPresenter.
+-->
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    >
+
+    <!-- Top margins set programatically -->
+    <androidx.leanback.widget.ResizingTextView
+        android:id="@+id/lb_details_description_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        style="?attr/detailsDescriptionTitleStyle"
+        />
+
+    <TextView
+        android:id="@+id/lb_details_description_subtitle"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone"
+        style="?attr/detailsDescriptionSubtitleStyle"
+        />
+
+    <TextView
+        android:id="@+id/lb_details_description_body"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        style="?attr/detailsDescriptionBodyStyle"
+        />
+</LinearLayout>

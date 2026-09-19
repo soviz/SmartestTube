@@ -283,23 +283,9 @@ public class VideoPlayerGlue extends MaxControlsVideoPlayerGlue<PlayerAdapter> i
             primary.add(mSkipPreviousAction);
             super.onCreatePrimaryActions(primary); // play/pause
             primary.add(mSkipNextAction);
-            // Everything else goes on the secondary row BELOW the transport row (its own dock in
-            // lb_playback_transport_controls_row.xml) instead of crowding the primary row, so
-            // Previous/Play/Next stay the only thing sharing that centered row.
-            if (secondary != null) {
-                if (mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_CHAT)) {
-                    secondary.add(mActions.get(R.id.action_chat));
-                }
-                if (mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_SUBTITLES)) {
-                    secondary.add(mActions.get(R.id.lb_control_closed_captioning));
-                }
-                if (mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_VIDEO_OFF)) {
-                    secondary.add(mActions.get(R.id.action_video_off));
-                }
-                if (mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_HIGH_QUALITY)) {
-                    secondary.add(mActions.get(R.id.lb_control_high_quality));
-                }
-            }
+            // Everything else that used to crowd the secondary row now lives behind the overflow
+            // (gear) menu instead - see getCompactOverflowActions()/performOverflowAction(). The
+            // secondary row itself stays empty in compact mode.
         } else {
             onCreatePrimaryActions(primary);
             if (secondary != null) {
@@ -314,6 +300,48 @@ public class VideoPlayerGlue extends MaxControlsVideoPlayerGlue<PlayerAdapter> i
         // MobilePlaybackFragment#syncCompactControls). Icon-only on purpose: a control rebuild must
         // not toggle progress/auto-hide, which the normal playback callbacks manage.
         syncPlayPauseAction();
+    }
+
+    /**
+     * MOD (phone): the actions that used to sit in the compact secondary row (repeat, chat,
+     * subtitles, video-off, high quality), now surfaced through the overflow (gear) menu instead.
+     * Video speed gets its own dedicated button (see {@link #getSpeedAction()}) rather than being
+     * buried in the menu. Returns only the ones the user has enabled in Player Tweaks, in the
+     * same order the old row used.
+     */
+    public java.util.List<Action> getCompactOverflowActions() {
+        java.util.List<Action> actions = new java.util.ArrayList<>();
+        if (mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_REPEAT_MODE)) {
+            actions.add(mActions.get(R.id.action_repeat));
+        }
+        if (mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_CHAT)) {
+            actions.add(mActions.get(R.id.action_chat));
+        }
+        if (mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_SUBTITLES)) {
+            actions.add(mActions.get(R.id.lb_control_closed_captioning));
+        }
+        if (mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_VIDEO_OFF)) {
+            actions.add(mActions.get(R.id.action_video_off));
+        }
+        if (mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_HIGH_QUALITY)) {
+            actions.add(mActions.get(R.id.lb_control_high_quality));
+        }
+        return actions;
+    }
+
+    /**
+     * MOD (phone): the video-speed action, shown as its own compact-mode button next to the
+     * overflow gear instead of being buried in its menu. Null if the user disabled the button in
+     * Player Tweaks.
+     */
+    public Action getSpeedAction() {
+        return mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_VIDEO_SPEED)
+                ? mActions.get(R.id.action_video_speed) : null;
+    }
+
+    /** Runs an action picked from the overflow (gear) menu, or the speed button, through the normal click path. */
+    public void performOverflowAction(Action action) {
+        onActionClicked(action);
     }
 
     @Override

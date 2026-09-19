@@ -113,6 +113,8 @@ public class MobilePlaybackFragment extends PlaybackFragment {
     private View mShortsActionRail;
     private ImageButton mShortsBackBtn;
     private ImageButton mFullscreenBtn;
+    private ImageButton mOverflowBtn;
+    private ImageButton mSpeedBtn;
     private LinearLayout mShortsInfoBar;
     private TextView mShortsTitleView;
     private TextView mShortsChannelView;
@@ -535,8 +537,10 @@ public class MobilePlaybackFragment extends PlaybackFragment {
 
     @Override
     public void updateSuggestions(VideoGroup group) {
-        // In strip mode the rows stay empty — see mSuggestionGroups.
-        if (!mStripMode) {
+        // In strip mode AND in landscape full-screen the rows stay empty — see mSuggestionGroups.
+        // Landscape playback should look like a plain full-screen video player, not show the
+        // related-videos rows over the video.
+        if (!mStripMode && !isLandscape()) {
             super.updateSuggestions(group);
         }
 
@@ -836,9 +840,19 @@ public class MobilePlaybackFragment extends PlaybackFragment {
         boolean showPanel = strip && !isShorts;
         String ratio = isShorts ? "H,9:16" : "H,4:3";
 
-        syncCompactControls(strip);
+        // MOD: compact controls (Previous/Play/Next centered, everything else in the secondary
+        // row) apply in every player state on phone/tablet, not just the portrait strip - keeps
+        // the transport row consistent between portrait and landscape/fullscreen.
+        syncCompactControls(true);
 
-        applyOverlayDecorVisibility(strip);
+        applyOverlayDecorVisibility(strip || isLandscape());
+
+        // Landscape full-screen: freeze the Leanback rows grid (the overlay title/controls row
+        // itself is one row of a VerticalGridView, normally used to scroll down into the
+        // suggestions rows below it) so a vertical drag on the overlay can't scroll it - with the
+        // suggestion rows hidden here too (see updateSuggestions/mSuggestionGroups), that scroll
+        // used to just reveal empty space. Portrait keeps it scrollable as before.
+        setOverlayScrollEnabled(!isLandscape());
 
         // System status/navigation bars: visible everywhere except landscape full-screen
         // playback (matches strip - true in every other player state, including Shorts).
@@ -881,8 +895,10 @@ public class MobilePlaybackFragment extends PlaybackFragment {
         }
 
         // Leanback suggestion rows: removed while in the strip (they draw inside the small video
-        // area and stay clickable underneath it), replayed from the cache on return to full-screen.
-        if (strip) {
+        // area and stay clickable underneath it) and in landscape full-screen (should look like a
+        // plain full-screen video player), replayed from the cache on return to the portrait
+        // full-screen state.
+        if (strip || isLandscape()) {
             super.clearSuggestions();
         } else {
             for (VideoGroup group : mSuggestionGroups) {
@@ -933,7 +949,9 @@ public class MobilePlaybackFragment extends PlaybackFragment {
         super.showControlsOverlay(runAnimation);
         // The overlay row views are created lazily on the first reveal — re-apply here so the
         // strip tweaks land no matter when the views appear.
-        applyOverlayDecorVisibility(mStripMode);
+        applyOverlayDecorVisibility(mStripMode || isLandscape());
+        // Same lazy-inflate re-apply for the overlay scroll freeze - see applyMobileLayout.
+        setOverlayScrollEnabled(!isLandscape());
         // Non-Shorts: ensure the control row is visible after the lazy inflate. In Shorts the
         // control row (transport buttons + seek bar + time) is owned by setShortsChrome.
         if (mLayoutState != 2) setShortsControlsVisible(true);
@@ -951,9 +969,35 @@ public class MobilePlaybackFragment extends PlaybackFragment {
                 }
             }
         }
-        // Back button and fullscreen toggle follow the player controls on all non-Shorts pages.
+        // Same lazy-inflate re-resolve for the overflow (gear) button.
+        if (mOverflowBtn == null) {
+            Activity activity = getActivity();
+            if (activity != null) {
+                mOverflowBtn = activity.findViewById(R.id.mobile_overflow_btn);
+                if (mOverflowBtn != null) {
+                    mOverflowBtn.setOnClickListener(this::showOverflowMenu);
+                }
+            }
+        }
+        // Same lazy-inflate re-resolve for the dedicated video-speed button.
+        if (mSpeedBtn == null) {
+            Activity activity = getActivity();
+            if (activity != null) {
+                mSpeedBtn = activity.findViewById(R.id.mobile_speed_btn);
+                if (mSpeedBtn != null) {
+                    mSpeedBtn.setOnClickListener(this::onSpeedBtnClicked);
+                }
+            }
+        }
+        // Back button and fullscreen/overflow/speed toggles follow the player controls on all
+        // non-Shorts pages.
         if (mShortsBackBtn != null && mLayoutState != 2) mShortsBackBtn.setVisibility(View.VISIBLE);
         if (mFullscreenBtn != null && mLayoutState != 2) mFullscreenBtn.setVisibility(View.VISIBLE);
+        if (mOverflowBtn != null && mLayoutState != 2) mOverflowBtn.setVisibility(View.VISIBLE);
+        if (mSpeedBtn != null && mLayoutState != 2) {
+            VideoPlayerGlue glue = getPlayerGlue();
+            mSpeedBtn.setVisibility(glue != null && glue.getSpeedAction() != null ? View.VISIBLE : View.GONE);
+        }
     }
 
     @Override
@@ -965,6 +1009,8 @@ public class MobilePlaybackFragment extends PlaybackFragment {
         if (mLayoutState == 2) return;
         if (mShortsBackBtn != null) mShortsBackBtn.setVisibility(View.INVISIBLE);
         if (mFullscreenBtn != null) mFullscreenBtn.setVisibility(View.INVISIBLE);
+        if (mOverflowBtn != null) mOverflowBtn.setVisibility(View.INVISIBLE);
+        if (mSpeedBtn != null) mSpeedBtn.setVisibility(View.INVISIBLE);
         super.hideControlsOverlay(runAnimation);
     }
 
@@ -1494,6 +1540,36 @@ public class MobilePlaybackFragment extends PlaybackFragment {
         }
     }
 
+    /** True in landscape orientation — the title overlay (controls_card) is never shown there. */
+    private boolean isLandscape() {
+        return getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE;
+    }
+
+    /**
+     * Freezes/unfreezes the Leanback playback overlay's internal VerticalGridView (a RecyclerView
+     * subclass) - the controls row and the suggestions rows below it are items in the same
+     * vertically-scrollable list. setLayoutFrozen is the same call the leanback module itself
+     * uses internally (BaseRowFragment/BaseRowSupportFragment) to pause a grid's scrolling, so
+     * it's a safe, already-battle-tested way to block the touch-drag scroll without touching
+     * PlaybackSupportFragment's own touch-intercept wiring (which onDispatchTouchEvent/
+     * interceptPlayerTouch build on top of and shouldn't be replaced).
+     */
+    private void setOverlayScrollEnabled(boolean enabled) {
+        androidx.leanback.widget.VerticalGridView gridView = getOverlayVerticalGridView();
+        if (gridView != null) {
+            gridView.setLayoutFrozen(!enabled);
+        }
+    }
+
+    private androidx.leanback.widget.VerticalGridView getOverlayVerticalGridView() {
+        androidx.fragment.app.Fragment rowsFragment =
+                getChildFragmentManager().findFragmentById(R.id.playback_controls_dock);
+        if (rowsFragment instanceof androidx.leanback.app.RowsSupportFragment) {
+            return ((androidx.leanback.app.RowsSupportFragment) rowsFragment).getVerticalGridView();
+        }
+        return null;
+    }
+
     /**
      * Trim/restore the control rows for the current mode. The glue is recreated with the full
      * action set on every engine init, so re-apply whenever the instance or the mode changes.
@@ -1504,6 +1580,70 @@ public class MobilePlaybackFragment extends PlaybackFragment {
             glue.setCompactControls(compact);
             mLastGlue = glue;
             mLastCompact = compact;
+        }
+    }
+
+    /**
+     * Overflow (gear) button handler: lists the actions that used to crowd the compact secondary
+     * row (repeat, chat, subtitles, video-off, HQ - speed has its own dedicated button, see
+     * {@link #mOverflowBtn}'s sibling {@code mobile_speed_btn}) in a popup menu, each entry
+     * keeping the same icon it had as a standalone button.
+     */
+    private void showOverflowMenu(View anchor) {
+        VideoPlayerGlue glue = getPlayerGlue();
+        if (glue == null) {
+            return;
+        }
+        List<androidx.leanback.widget.Action> actions = glue.getCompactOverflowActions();
+        if (actions.isEmpty()) {
+            return;
+        }
+        android.widget.PopupMenu popup = new android.widget.PopupMenu(anchor.getContext(), anchor);
+        for (int i = 0; i < actions.size(); i++) {
+            androidx.leanback.widget.Action action = actions.get(i);
+            if (action != null) {
+                android.view.MenuItem item = popup.getMenu().add(0, i, i, action.getLabel1());
+                if (action.getIcon() != null) {
+                    item.setIcon(action.getIcon());
+                }
+            }
+        }
+        forceShowMenuIcons(popup);
+        popup.setOnMenuItemClickListener(item -> {
+            androidx.leanback.widget.Action action = actions.get(item.getItemId());
+            glue.performOverflowAction(action);
+            return true;
+        });
+        popup.show();
+    }
+
+    /**
+     * PopupMenu hides item icons by default outside its overflow variant. There's no public API
+     * for this (setForceShowIcon was only ever exposed on the internal MenuPopupHelper), so this
+     * reaches it via reflection - a no-op, not a crash, if a future Android version removes it.
+     */
+    private void forceShowMenuIcons(android.widget.PopupMenu popup) {
+        try {
+            java.lang.reflect.Field field = popup.getClass().getDeclaredField("mPopup");
+            field.setAccessible(true);
+            Object helper = field.get(popup);
+            helper.getClass()
+                    .getMethod("setForceShowIcon", boolean.class)
+                    .invoke(helper, true);
+        } catch (Exception ignored) {
+            // Icons just won't show; the text-only menu still works.
+        }
+    }
+
+    /** Dedicated video-speed button: runs the action through the normal click path. */
+    private void onSpeedBtnClicked(View v) {
+        VideoPlayerGlue glue = getPlayerGlue();
+        if (glue == null) {
+            return;
+        }
+        androidx.leanback.widget.Action action = glue.getSpeedAction();
+        if (action != null) {
+            glue.performOverflowAction(action);
         }
     }
 
@@ -1738,6 +1878,20 @@ public class MobilePlaybackFragment extends PlaybackFragment {
         mFullscreenBtn = activity.findViewById(R.id.mobile_fullscreen_btn);
         if (mFullscreenBtn != null) {
             mFullscreenBtn.setOnClickListener(v -> toggleFullscreen());
+        }
+
+        // Overflow (gear) button: shows the compact-mode-only actions (repeat, chat, subtitles,
+        // video-off, HQ) in a popup menu instead of crowding the secondary row. See
+        // VideoPlayerGlue#getCompactOverflowActions.
+        mOverflowBtn = activity.findViewById(R.id.mobile_overflow_btn);
+        if (mOverflowBtn != null) {
+            mOverflowBtn.setOnClickListener(this::showOverflowMenu);
+        }
+
+        // Dedicated video-speed button, next to the overflow gear. See VideoPlayerGlue#getSpeedAction.
+        mSpeedBtn = activity.findViewById(R.id.mobile_speed_btn);
+        if (mSpeedBtn != null) {
+            mSpeedBtn.setOnClickListener(this::onSpeedBtnClicked);
         }
 
         // Centred play/pause indicator (ImageView — visual only, not tappable directly).

@@ -39,4 +39,8 @@
          height, with padding shrinking the icon inside it further. -->
     <dimen name="lb_fullscreen_button_size">40dp</dimen>
     <dimen name="lb_fullscreen_button_padding">8dp</dimen>
+
+    <!-- Phone override: the TV default (34sp/28sp) is too large for a phone-width video title. -->
+    <dimen name="lb_details_description_title_text_size">15sp</dimen>
+    <dimen name="lb_details_description_title_resized_text_size">14sp</dimen>
 </resources>

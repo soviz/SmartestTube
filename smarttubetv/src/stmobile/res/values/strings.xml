@@ -21,6 +21,7 @@
     <!-- Player bottom nav bar -->
     <string name="header_you">You</string>
     <string name="mobile_fullscreen_toggle">Toggle fullscreen</string>
+    <string name="mobile_overflow_toggle">More options</string>
 
     <!-- About screen -->
     <string name="mobile_about_title">About SmarterTube</string>
