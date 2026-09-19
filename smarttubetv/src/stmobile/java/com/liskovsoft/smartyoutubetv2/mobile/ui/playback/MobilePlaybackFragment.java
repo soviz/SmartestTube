@@ -631,7 +631,11 @@ public class MobilePlaybackFragment extends PlaybackFragment {
         // Landscape full-screen: swipe-down-to-minimize is off (only the portrait strip has it) —
         // a vertical drag there is easy to trigger by accident while reaching for the seek bar
         // or transport controls on a wide screen.
-        if (mLayoutState != 0 && handleWindowedSwipeEvent(event, playerView)) {
+        // Also off while the controls overlay (seek bar) is shown, otherwise a finger dragging
+        // the seek bar thumb that wobbles vertically past the slop gets misread as a swipe-to-
+        // minimize gesture and every following ACTION_MOVE is swallowed here instead of reaching
+        // the seek bar, breaking the drag almost as soon as it starts.
+        if (mLayoutState != 0 && !isOverlayShown() && handleWindowedSwipeEvent(event, playerView)) {
             return true;
         }
 

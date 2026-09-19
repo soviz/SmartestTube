@@ -28,6 +28,7 @@ import android.os.Bundle;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewParent;
 import androidx.annotation.RestrictTo;
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat;
 import androidx.leanback.R;
@@ -441,9 +442,10 @@ public final class SeekBar extends View {
      * ancestors from stealing events in the drag.
      */
     private void attemptClaimDrag() {
-        //if (mParent != null) {
-        //    mParent.requestDisallowInterceptTouchEvent(true);
-        //}
+        ViewParent parent = getParent();
+        if (parent != null) {
+            parent.requestDisallowInterceptTouchEvent(true);
+        }
     }
 
     /**

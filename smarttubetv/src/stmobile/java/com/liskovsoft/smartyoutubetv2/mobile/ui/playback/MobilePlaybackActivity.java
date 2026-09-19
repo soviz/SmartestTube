@@ -148,6 +148,18 @@ public class MobilePlaybackActivity extends PlaybackActivity {
         }
     }
 
+    /**
+     * Programmatic equivalent of dismissing the PIP window (the X): same unblock-then-finishReally
+     * sequence as {@link #onPictureInPictureModeChanged}, for callers (e.g. opening Settings) that
+     * need PIP closed on demand rather than waiting for the system callback.
+     */
+    public void exitPip() {
+        if (mMobileFragment != null) {
+            mMobileFragment.blockEngine(false);
+        }
+        finishReally();
+    }
+
     @Override
     public boolean dispatchTouchEvent(MotionEvent event) {
         // While the overlay is faded out its buttons are still hit-testable (Leanback hides by

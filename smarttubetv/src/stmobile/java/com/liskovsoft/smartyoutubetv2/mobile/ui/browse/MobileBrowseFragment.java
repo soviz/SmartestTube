@@ -1,5 +1,6 @@
 package com.liskovsoft.smartyoutubetv2.mobile.ui.browse;
 
+import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
@@ -40,6 +41,7 @@ import com.liskovsoft.smartyoutubetv2.common.app.models.data.Video;
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.VideoGroup;
 import com.liskovsoft.smartyoutubetv2.common.app.models.errors.ErrorFragmentData;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.BrowsePresenter;
+import com.liskovsoft.smartyoutubetv2.common.app.presenters.PlaybackPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.SearchPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.dialogs.AccountSelectionPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.settings.AccountSettingsPresenter;
@@ -49,6 +51,7 @@ import com.liskovsoft.smartyoutubetv2.common.misc.MediaServiceManager;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerData;
 import com.liskovsoft.smartyoutubetv2.mobile.notifications.NotificationPollWorker;
 import com.liskovsoft.smartyoutubetv2.mobile.ui.about.MobileAboutActivity;
+import com.liskovsoft.smartyoutubetv2.mobile.ui.playback.MobilePlaybackActivity;
 import com.liskovsoft.smartyoutubetv2.mobile.ui.prefs.MobileNotificationPrefs;
 import com.liskovsoft.smartyoutubetv2.mobile.ui.prefs.MobileThemePrefs;
 import com.liskovsoft.smartyoutubetv2.tv.R;
@@ -622,6 +625,21 @@ public class MobileBrowseFragment extends Fragment implements BrowseView, MediaS
 
     // ----- helpers -----
 
+    /**
+     * Settings opening over an active PIP player leaves the pop-up floating on top of (or behind)
+     * the settings UI with no way to reach it - close PIP for real (not just move it to background)
+     * so opening Settings always lands on a clean screen.
+     */
+    private void closePipIfNeeded() {
+        if (getContext() == null || !PlaybackPresenter.instance(getContext()).isInPipMode()) {
+            return;
+        }
+        Activity activity = PlaybackPresenter.instance(getContext()).getActivity();
+        if (activity instanceof MobilePlaybackActivity) {
+            ((MobilePlaybackActivity) activity).exitPip();
+        }
+    }
+
     private void setupContentForType(BrowseSection section) {
         hideEmptyMessage();
         mContentList.clearOnScrollListeners();
@@ -664,6 +682,7 @@ public class MobileBrowseFragment extends Fragment implements BrowseView, MediaS
             mShelfAdapter = null;
             mGridAdapter = null;
             mFolderAdapter = null;
+            closePipIfNeeded();
         } else {
             mGridAdapter = new VideoCardAdapter(mGridCardWidth, mVideoClick, mVideoLongClick);
             mShelfAdapter = null;
