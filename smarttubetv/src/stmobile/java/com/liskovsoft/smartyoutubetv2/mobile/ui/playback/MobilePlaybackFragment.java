@@ -546,11 +546,12 @@ public class MobilePlaybackFragment extends PlaybackFragment {
     /**
      * Views + publish date: all non-author segments of "Author • date • views"
      * (order as produced by YouTubeHelper.createInfo), joined back with the same delimiter,
-     * e.g. "107K views • 1 month ago".
+     * e.g. "107K views • 1 month ago". Uses the card's relative-date second title (same one
+     * feed cards show, e.g. "1 day ago") rather than getSecondTitleFull()'s absolute
+     * "Published on ..." date from the video's own metadata.
      */
     private String extractViews(Video video) {
-        CharSequence full = video.getSecondTitleFull();
-        String second = Helpers.toString(full != null ? full : video.getSecondTitle());
+        String second = Helpers.toString(video.getSecondTitle());
         String author = video.getAuthor();
         if (second == null) {
             return "";
@@ -935,13 +936,12 @@ public class MobilePlaybackFragment extends PlaybackFragment {
         boolean inPip = isInPipMode();
 
         // Strip mode now also covers Shorts: the player becomes a top-aligned aspect-ratio strip
-        // instead of a vertically-centered full-screen surface. Regular videos get a 4:3 strip
-        // (taller than the source 16:9 video - ExoPlayer letterboxes it - so the strip itself
-        // takes up noticeably more of the screen than a strict 16:9 box would) with the up-next
-        // panel below; a Short gets a 9:16 strip with the Shorts info bar + action rail.
+        // instead of a vertically-centered full-screen surface. Regular videos get a 16:9 strip
+        // with the up-next panel below; a Short gets a 9:16 strip with the Shorts info bar +
+        // action rail.
         boolean strip = portrait && !inPip && video != null;
         boolean showPanel = strip && !isShorts;
-        String ratio = isShorts ? "H,9:16" : "H,4:3";
+        String ratio = isShorts ? "H,9:16" : "H,16:9";
 
         // MOD: compact controls (Previous/Play/Next centered, everything else in the secondary
         // row) apply in every player state on phone/tablet, not just the portrait strip - keeps
