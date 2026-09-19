@@ -1,16 +1,8 @@
 package com.liskovsoft.smartyoutubetv2.mobile.ui.playback;
 
-import android.app.PendingIntent;
-import android.app.PictureInPictureParams;
-import android.app.RemoteAction;
-import android.content.BroadcastReceiver;
-import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.pm.ActivityInfo;
 import android.content.res.Configuration;
-import android.graphics.drawable.Icon;
-import android.os.Build;
 import android.os.Bundle;
 import android.view.MotionEvent;
 
@@ -26,8 +18,6 @@ import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerData;
 import com.liskovsoft.smartyoutubetv2.tv.R;
 import com.liskovsoft.smartyoutubetv2.tv.ui.playback.PlaybackActivity;
 
-import java.util.Collections;
-
 /**
  * Phone playback host for the stmobile flavor.
  *
@@ -42,15 +32,7 @@ import java.util.Collections;
  * the first video's orientation until the activity is recreated.
  */
 public class MobilePlaybackActivity extends PlaybackActivity {
-    private static final String ACTION_PIP_CLOSE = "com.liskovsoft.smartyoutubetv2.mobile.ACTION_PIP_CLOSE";
     private MobilePlaybackFragment mMobileFragment;
-    private final BroadcastReceiver mPipCloseReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            exitPip();
-        }
-    };
-    private boolean mPipCloseReceiverRegistered;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -73,23 +55,6 @@ public class MobilePlaybackActivity extends PlaybackActivity {
         }
 
         applyOrientationForCurrentVideo();
-
-        IntentFilter filter = new IntentFilter(ACTION_PIP_CLOSE);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(mPipCloseReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
-        } else {
-            registerReceiver(mPipCloseReceiver, filter);
-        }
-        mPipCloseReceiverRegistered = true;
-    }
-
-    @Override
-    protected void onDestroy() {
-        if (mPipCloseReceiverRegistered) {
-            unregisterReceiver(mPipCloseReceiver);
-            mPipCloseReceiverRegistered = false;
-        }
-        super.onDestroy();
     }
 
     @Override
@@ -213,50 +178,12 @@ public class MobilePlaybackActivity extends PlaybackActivity {
     public void onPictureInPictureModeChanged(boolean isInPictureInPictureMode) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode);
 
-        if (isInPictureInPictureMode) {
-            applyPipCloseAction();
-            return;
-        }
-
-        if (!getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.STARTED)) {
+        if (!isInPictureInPictureMode
+                && !getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.STARTED)) {
             if (mMobileFragment != null) {
                 mMobileFragment.blockEngine(false);
             }
             finishReally();
-        }
-    }
-
-    /**
-     * Adds an explicit close ("X") button to the system PIP window's action overlay.
-     *
-     * The platform PIP window is drawn entirely by the OS — an app cannot overlay its own views
-     * on top of it, only contribute {@link RemoteAction} buttons via
-     * {@link PictureInPictureParams.Builder#setActions}, which the system shows when the user taps
-     * the PIP window. Tapping this action broadcasts {@link #ACTION_PIP_CLOSE}, handled by
-     * {@link #mPipCloseReceiver}, which calls {@link #exitPip()} — the same unblock-then-finish
-     * path used when the user dismisses PIP via the system's own swipe-away gesture.
-     */
-    private void applyPipCloseAction() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-            return;
-        }
-
-        Icon icon = Icon.createWithResource(this, R.drawable.ic_pip_close);
-        CharSequence title = getString(R.string.mobile_pip_close);
-        PendingIntent intent = PendingIntent.getBroadcast(
-                this,
-                0,
-                new Intent(ACTION_PIP_CLOSE).setPackage(getPackageName()),
-                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-
-        RemoteAction closeAction = new RemoteAction(icon, title, title, intent);
-
-        try {
-            setPictureInPictureParams(new PictureInPictureParams.Builder()
-                    .setActions(Collections.singletonList(closeAction))
-                    .build());
-        } catch (Exception e) {
-            // Some OEM implementations reject param updates while transitioning into PIP.
         }
     }
 

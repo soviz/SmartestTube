@@ -143,7 +143,7 @@
         android:layout_width="58dp"
         android:layout_height="58dp"
         android:padding="12dp"
-        android:src="@android:drawable/ic_menu_preferences"
+        android:src="@drawable/ic_player_settings"
         android:background="@android:color/transparent"
         android:scaleType="fitCenter"
         android:visibility="gone"

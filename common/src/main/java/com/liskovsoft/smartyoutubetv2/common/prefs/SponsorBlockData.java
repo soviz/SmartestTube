@@ -293,15 +293,20 @@ public class SponsorBlockData {
         // Easy add new segments
         for (String segmentCategory : mAllCategories) {
             if (getAction(segmentCategory) == ACTION_UNDEFINED) {
-                // Disable filler category by default
-                // This category is very extreme and is recommended to be disabled by default because of that.
-                if (SponsorSegment.CATEGORY_FILLER.equals(segmentCategory)) {
-                    mActions.add(SegmentAction.from(segmentCategory, ACTION_DO_NOTHING));
-                } else {
-                    mActions.add(SegmentAction.from(segmentCategory, ACTION_SKIP_WITH_TOAST));
-                }
+                mActions.add(SegmentAction.from(segmentCategory, getDefaultAction(segmentCategory)));
             }
         }
+    }
+
+    private int getDefaultAction(String segmentCategory) {
+        // Only Sponsor/Interaction/Unpaid-promo are skipped by default. The rest are left untouched (do nothing).
+        if (SponsorSegment.CATEGORY_SPONSOR.equals(segmentCategory)
+                || SponsorSegment.CATEGORY_INTERACTION.equals(segmentCategory)
+                || SponsorSegment.CATEGORY_SELF_PROMO.equals(segmentCategory)) {
+            return ACTION_SKIP_ONLY;
+        }
+
+        return ACTION_DO_NOTHING;
     }
 
     private void persistState() {

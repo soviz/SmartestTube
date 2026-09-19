@@ -81,6 +81,7 @@ public class SponsorBlockSettingsPresenter extends BasePresenter<Void> {
         for (SegmentAction action : actions) {
             options.add(UiOptionItem.from(
                     getColoredString(mSponsorBlockData.getLocalizedRes(action.segmentCategory), mSponsorBlockData.getColorRes(action.segmentCategory)),
+                    getActionTitle(action.actionType),
                     optionItem -> {
                         AppDialogPresenter dialogPresenter = AppDialogPresenter.instance(getContext());
 
@@ -169,6 +170,21 @@ public class SponsorBlockSettingsPresenter extends BasePresenter<Void> {
         }
 
         settingsPresenter.appendSingleButton(AppDialogUtil.createExcludeFromContentBlockButton(getContext(), video, MediaServiceManager.instance(), settingsPresenter::closeDialog));
+    }
+
+    private String getActionTitle(int actionType) {
+        switch (actionType) {
+            case SponsorBlockData.ACTION_DO_NOTHING:
+                return getContext().getString(R.string.content_block_action_none);
+            case SponsorBlockData.ACTION_SKIP_ONLY:
+                return getContext().getString(R.string.content_block_action_only_skip);
+            case SponsorBlockData.ACTION_SKIP_WITH_TOAST:
+                return getContext().getString(R.string.content_block_action_toast);
+            case SponsorBlockData.ACTION_SHOW_DIALOG:
+                return getContext().getString(R.string.content_block_action_dialog);
+        }
+
+        return null;
     }
 
     private CharSequence getColoredString(int strResId, int colorResId) {
