@@ -82,7 +82,7 @@ public class MobileBrowseFragment extends Fragment implements BrowseView, MediaS
     private TextView mToolbarTitle;
     private ImageView mAccountView;
     private View mBottomNavHome;
-    private View mBottomNavMusic;
+    private View mBottomNavSubscriptions;
     private View mBottomNavHistory;
     private SectionAdapter mSectionAdapter;
     private VideoCardAdapter mGridAdapter;
@@ -171,12 +171,12 @@ public class MobileBrowseFragment extends Fragment implements BrowseView, MediaS
             startActivity(new Intent(getContext(), MobileAboutActivity.class));
         });
 
-        // Bottom navigation bar: Home / Music / History jump straight to that section.
+        // Bottom navigation bar: Home / Subscriptions / History jump straight to that section.
         mBottomNavHome = view.findViewById(R.id.bottom_nav_home);
-        mBottomNavMusic = view.findViewById(R.id.bottom_nav_music);
+        mBottomNavSubscriptions = view.findViewById(R.id.bottom_nav_subscriptions);
         mBottomNavHistory = view.findViewById(R.id.bottom_nav_history);
         mBottomNavHome.setOnClickListener(v -> navigateToSection(MediaGroup.TYPE_HOME));
-        mBottomNavMusic.setOnClickListener(v -> navigateToSection(MediaGroup.TYPE_MUSIC));
+        mBottomNavSubscriptions.setOnClickListener(v -> navigateToSection(MediaGroup.TYPE_SUBSCRIPTIONS));
         mBottomNavHistory.setOnClickListener(v -> navigateToSection(MediaGroup.TYPE_HISTORY));
 
         int screenWidth = getResources().getDisplayMetrics().widthPixels;
@@ -349,7 +349,7 @@ public class MobileBrowseFragment extends Fragment implements BrowseView, MediaS
     /** Highlights the bottom nav bar tab matching the now-selected section, if any. */
     private void updateBottomNavSelection(int sectionId) {
         setBottomNavSelected(mBottomNavHome, sectionId == MediaGroup.TYPE_HOME);
-        setBottomNavSelected(mBottomNavMusic, sectionId == MediaGroup.TYPE_MUSIC);
+        setBottomNavSelected(mBottomNavSubscriptions, sectionId == MediaGroup.TYPE_SUBSCRIPTIONS);
         setBottomNavSelected(mBottomNavHistory, sectionId == MediaGroup.TYPE_HISTORY);
     }
 
@@ -1007,7 +1007,7 @@ public class MobileBrowseFragment extends Fragment implements BrowseView, MediaS
         if (mSectionAdapter == null) {
             return;
         }
-        int[] tabSectionIds = {MediaGroup.TYPE_HOME, MediaGroup.TYPE_MUSIC, MediaGroup.TYPE_HISTORY};
+        int[] tabSectionIds = {MediaGroup.TYPE_HOME, MediaGroup.TYPE_SUBSCRIPTIONS, MediaGroup.TYPE_HISTORY};
         int currentTab = -1;
         for (int i = 0; i < tabSectionIds.length; i++) {
             if (tabSectionIds[i] == mCurrentSectionId) {

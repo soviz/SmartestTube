@@ -181,7 +181,7 @@
             </LinearLayout>
         </FrameLayout>
 
-        <!-- Bottom navigation bar: Home / Music / History. Active tab is highlighted via a
+        <!-- Bottom navigation bar: Home / Subscriptions / History. Active tab is highlighted via a
              color selector (icon/text tint only) driven by
              MobileBrowseFragment.setBottomNavSelected() toggling View.setSelected(). -->
         <LinearLayout
@@ -211,7 +211,7 @@
             </LinearLayout>
 
             <LinearLayout
-                android:id="@+id/bottom_nav_music"
+                android:id="@+id/bottom_nav_subscriptions"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_weight="1"
@@ -219,12 +219,12 @@
                 android:gravity="center"
                 android:background="?android:attr/selectableItemBackground">
                 <ImageView android:layout_width="24dp" android:layout_height="24dp"
-                    android:src="@drawable/icon_music"
+                    android:src="@drawable/icon_subscriptions"
                     android:tint="@color/bottom_nav_icon_color"
                     android:duplicateParentState="true"/>
                 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
                     android:paddingTop="2dp"
-                    android:textSize="11sp" android:text="@string/header_music"
+                    android:textSize="11sp" android:text="@string/header_subscriptions"
                     android:textColor="@color/bottom_nav_icon_color"
                     android:duplicateParentState="true"/>
             </LinearLayout>
