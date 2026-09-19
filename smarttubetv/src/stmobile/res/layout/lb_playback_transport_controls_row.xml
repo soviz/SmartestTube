@@ -219,13 +219,14 @@
 
             <ImageButton
                 android:id="@+id/mobile_fullscreen_btn"
-                android:layout_width="@dimen/lb_control_button_height"
-                android:layout_height="@dimen/lb_control_button_height"
+                android:layout_width="@dimen/lb_fullscreen_button_size"
+                android:layout_height="@dimen/lb_fullscreen_button_size"
                 android:layout_alignParentEnd="true"
                 android:layout_centerVertical="true"
+                android:padding="@dimen/lb_fullscreen_button_padding"
                 android:src="@drawable/ic_fullscreen_enter"
                 android:background="@android:color/transparent"
-                android:scaleType="center"
+                android:scaleType="fitCenter"
                 android:visibility="visible"
                 android:contentDescription="@string/mobile_fullscreen_toggle" />
         </RelativeLayout>

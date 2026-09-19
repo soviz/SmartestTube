@@ -31,7 +31,12 @@
     <!-- Phone override: bigger primary transport buttons (Previous/Play/Next) than the TV
          10-foot default, and bigger icons inside them, for touch targets and visibility. -->
     <dimen name="lb_control_button_diameter">108dp</dimen>
-    <dimen name="lb_control_button_height">76dp</dimen>
-    <dimen name="lb_control_icon_width">40dp</dimen>
-    <dimen name="lb_control_icon_height">40dp</dimen>
+    <dimen name="lb_control_button_height">53dp</dimen>
+    <dimen name="lb_control_icon_width">28dp</dimen>
+    <dimen name="lb_control_icon_height">28dp</dimen>
+
+    <!-- Fullscreen toggle in the secondary controls row: kept smaller than the row's own
+         height, with padding shrinking the icon inside it further. -->
+    <dimen name="lb_fullscreen_button_size">40dp</dimen>
+    <dimen name="lb_fullscreen_button_padding">8dp</dimen>
 </resources>

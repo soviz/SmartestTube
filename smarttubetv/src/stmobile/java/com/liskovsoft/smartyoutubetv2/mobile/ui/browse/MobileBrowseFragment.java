@@ -395,6 +395,13 @@ public class MobileBrowseFragment extends Fragment implements BrowseView, MediaS
                 } else if (mShelfAdapter != null) {
                     mShelfAdapter.appendGroup(group);
                 } else if (mGridAdapter != null) {
+                    // Home mixes multiple topic groups (Recommendations, Trending, etc.) into
+                    // one API response; keep only the first (Recommendations) instead of
+                    // dumping every topic into the same feed.
+                    if (mCurrentSectionId == MediaGroup.TYPE_HOME && !mGridGroupSizes.isEmpty()
+                            && !mGridGroupSizes.containsKey(group)) {
+                        break;
+                    }
                     appendGridGroup(group);
                 }
                 break;
@@ -658,8 +665,7 @@ public class MobileBrowseFragment extends Fragment implements BrowseView, MediaS
             mContentList.addOnScrollListener(mFolderScrollListener);
             mGenres = new ArrayList<>();
             mSelectedGenre = null;
-        } else if (type == BrowseSection.TYPE_ROW
-                && (section.getId() == MediaGroup.TYPE_HOME || section.getId() == MediaGroup.TYPE_SUBSCRIPTIONS)) {
+        } else if (section.getId() == MediaGroup.TYPE_HOME || section.getId() == MediaGroup.TYPE_SUBSCRIPTIONS) {
             // Home ("Recommended") and Subscriptions: a single full-width column instead of
             // horizontal shelves-per-topic, with lazy-load-on-scroll like the other grid sections
             // (span 1, so each card fills the screen width).
