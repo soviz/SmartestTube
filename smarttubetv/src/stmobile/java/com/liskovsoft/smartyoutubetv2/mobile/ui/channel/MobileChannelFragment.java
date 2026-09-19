@@ -60,7 +60,6 @@ public class MobileChannelFragment extends Fragment implements ChannelView {
     private boolean mSwipeRefreshing;
     private TextView mSubscribeButton;
     private ImageView mBellButton;
-    private View mHeaderView;
     private ImageView mAvatarView;
     private TextView mSubsHeaderView;
     private MediaItemService mItemService;
@@ -88,7 +87,6 @@ public class MobileChannelFragment extends Fragment implements ChannelView {
         mTitleView = view.findViewById(R.id.channel_title);
         mSubscribeButton = view.findViewById(R.id.btn_subscribe);
         mBellButton = (ImageView) view.findViewById(R.id.btn_bell);
-        mHeaderView = view.findViewById(R.id.channel_header);
         mAvatarView = view.findViewById(R.id.channel_avatar);
         mSubsHeaderView = view.findViewById(R.id.channel_subs);
 
@@ -348,7 +346,6 @@ public class MobileChannelFragment extends Fragment implements ChannelView {
         if (mSubsHeaderView != null) {
             mSubsHeaderView.setText(hasSubs ? subscriberCount : "");
         }
-        if (mHeaderView != null) mHeaderView.setVisibility(View.VISIBLE);
     }
 
     private static Video firstPlayable(VideoGroup group) {

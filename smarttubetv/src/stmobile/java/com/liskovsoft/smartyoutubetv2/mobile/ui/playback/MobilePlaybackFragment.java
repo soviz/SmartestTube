@@ -8,6 +8,7 @@ import android.content.res.Configuration;
 import android.graphics.Rect;
 import android.os.Build.VERSION;
 import android.os.Build.VERSION_CODES;
+import android.os.Bundle;
 import android.os.Handler;
 import android.support.v4.media.session.MediaSessionCompat;
 import android.view.Window;
@@ -226,6 +227,25 @@ public class MobilePlaybackFragment extends PlaybackFragment {
      * returns to full-screen.
      */
     private final List<VideoGroup> mSuggestionGroups = new ArrayList<>();
+
+    @Override
+    public void onViewCreated(View view, Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+        // Apply bars visibility as early as possible, before onResume/setVideo. Confirmed via
+        // logcat (InsetsController's from= stack traces): the platform's own
+        // ViewRootImpl.controlInsetsForCompatibility hides the status bar automatically the
+        // moment this activity's window is first added (WindowManagerGlobal.addView, right after
+        // onResume in the activity lifecycle), and this fragment's own applySystemBarsVisibility
+        // call was landing only from setVideo() - which fires once the video's metadata actually
+        // arrives, up to ~1 second later on a cold player start. That gap is exactly the "status
+        // bar appears late and pushes the strip down" jump. onResume() looked like the natural
+        // place to close that gap, but initPanelViews() there can still fail if the sibling views
+        // in the activity layout aren't resolvable yet at that point in this particular flow (the
+        // logcat trace showed no onResume call reaching applySystemBarsVisibility at all on a
+        // fresh player open) - onViewCreated is called once this fragment's own view (and by
+        // then its activity siblings) exist, so initPanelViews() can succeed here reliably.
+        applyMobileLayout();
+    }
 
     @Override
     public void onResume() {
@@ -958,8 +978,14 @@ public class MobilePlaybackFragment extends PlaybackFragment {
         setOverlayScrollEnabled(!isLandscape());
 
         // System status/navigation bars: visible everywhere except landscape full-screen
-        // playback (matches strip - true in every other player state, including Shorts).
-        applySystemBarsVisibility(strip);
+        // playback. Deliberately NOT keyed on `strip` (which also requires video != null) -
+        // before the video arrives this runs with strip forced false, which would flip bars
+        // visibility true->false->true and, since the bars-visible margin (top inset on the
+        // player) is applied async via a WindowInsets callback, show up as the player strip
+        // jumping down a frame or two after its first layout. Portrait bars-visibility is the
+        // same whether or not a video is loaded, so basing it on orientation alone keeps the
+        // margin stable across that transition - landscape/PiP still hide the bars as before.
+        applySystemBarsVisibility(portrait && !inPip);
 
         // Fullscreen toggle icon: offer to enter fullscreen while in the strip, exit while
         // already full-screen. Kept outside the early-return below so it stays correct even on

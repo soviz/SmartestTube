@@ -11,6 +11,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.bumptech.glide.Glide;
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.Video;
+import com.liskovsoft.smartyoutubetv2.common.app.presenters.ChannelPresenter;
 import com.liskovsoft.smartyoutubetv2.tv.R;
 
 import java.util.ArrayList;
@@ -200,6 +201,7 @@ public class VideoCardAdapter extends RecyclerView.Adapter<VideoCardAdapter.View
             }
         } else {
             holder.author.setText(author != null ? author : "");
+            holder.author.setOnClickListener(v -> ChannelPresenter.instance(v.getContext()).openChannel(video));
 
             // View count + publish date, e.g. "1.2M views • 3 days ago". getSecondTitleFull()
             // is the raw "Channel • views • published" string the author was parsed out of

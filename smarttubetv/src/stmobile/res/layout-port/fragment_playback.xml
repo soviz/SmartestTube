@@ -1,0 +1,869 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    stmobile override of the player activity content (main: a bare full-screen PlaybackFragment).
+
+    Adds an upright/portrait mode: the player fragment is constrained to a 16:9 strip at the top
+    and a below-video panel (title + channel + up-next list) fills the rest. The constraints are
+    switched at runtime by MobilePlaybackFragment.applyMobileLayout() once the real video is known
+    — but THIS is the layout-port variant, inflated only in portrait, so its defaults are already
+    that 16:9-strip-plus-panel state instead of the layout/ folder's full-screen default. That
+    avoids the player visibly jumping from full-screen to a 16:9 strip once the video arrives:
+    applyMobileLayout's own ConstraintSet still runs on the first video (mLayoutState starts at 0,
+    the full-screen sentinel, so it isn't skipped), but it now reapplies values that already match
+    what's on screen. The fragment class is the mobile subclass which feeds the panel; the tag
+    must stay @string/playback_tag (PlaybackActivity looks the fragment up by tag and checks
+    instanceof PlaybackFragment).
+-->
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/mobile_playback_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/black">
+
+    <fragment
+        android:id="@+id/playback_controls_fragment"
+        android:name="com.liskovsoft.smartyoutubetv2.mobile.ui.playback.MobilePlaybackFragment"
+        android:tag="@string/playback_tag"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintDimensionRatio="H,16:9"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!--
+        Video-off cover is NOT declared here. Placing it as a sibling of the fragment in this
+        ConstraintLayout would draw it above the fragment's ENTIRE content (video surface AND
+        transport controls together, since they're both inside the fragment's own view subtree) -
+        there is no way to interleave a sibling view between two views of a different subtree.
+        Instead it's created programmatically in MobilePlaybackFragment and inserted directly into
+        R.id.surface_root (from the fork-local smarttubetv/src/main/res/layout/lb_playback_fragment.xml
+        - NOT the leanback-1.0.0 submodule's same-named layout, which that file shadows and which is
+        never actually inflated), the AspectRatioFrameLayout ExoPlayer's own SurfaceView/TextureView
+        is added into - see MobilePlaybackFragment.ensureVideoOffCover().
+    -->
+
+    <!--
+        Shorts pager filmstrip posters: full-screen thumbnails of the previous / next Short.
+        Parked one screen-height above / below and slid in with the drag (see
+        MobilePlaybackFragment.setShortsPageTranslation). Hidden except during an active swipe.
+    -->
+    <ImageView
+        android:id="@+id/mobile_shorts_prev_poster"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:scaleType="centerCrop"
+        android:background="@android:color/black"
+        android:visibility="invisible"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <ImageView
+        android:id="@+id/mobile_shorts_next_poster"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:scaleType="centerCrop"
+        android:background="@android:color/black"
+        android:visibility="invisible"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!--
+        Shorts overlay: right-edge action rail (like/dislike/comments/channel).
+        Constrained to the right side of the video strip; vertically centered within it.
+        Hidden by default; revealed/hidden by MobilePlaybackFragment's auto-hide logic.
+    -->
+    <include
+        layout="@layout/mobile_shorts_action_rail"
+        android:id="@+id/mobile_shorts_action_rail"
+        android:layout_width="64dp"
+        android:layout_height="wrap_content"
+        android:visibility="invisible"
+        app:layout_constraintEnd_toEndOf="@id/playback_controls_fragment"
+        app:layout_constraintTop_toTopOf="@id/playback_controls_fragment"
+        app:layout_constraintBottom_toBottomOf="@id/playback_controls_fragment"
+        android:layout_marginEnd="4dp" />
+
+    <!--
+        Shorts overlay: back button, top-left corner of the video strip.
+        Hidden by default; revealed/hidden with the action rail.
+    -->
+    <ImageButton
+        android:id="@+id/mobile_shorts_back_btn"
+        android:layout_width="58dp"
+        android:layout_height="58dp"
+        android:src="@drawable/ic_shorts_back"
+        android:background="@android:color/transparent"
+        android:scaleType="center"
+        android:visibility="visible"
+        android:contentDescription="Back"
+        app:layout_constraintStart_toStartOf="@id/playback_controls_fragment"
+        app:layout_constraintTop_toTopOf="@id/playback_controls_fragment"
+        android:layout_marginStart="4dp"
+        android:layout_marginTop="4dp" />
+
+    <!--
+        (mobile_fullscreen_btn now lives inside lb_playback_transport_controls_row.xml, in the
+        same secondary-controls row as CC/HQ/chat, so it no longer needs a separately positioned
+        overlay here - see that file for details.)
+    -->
+
+    <!--
+        Overflow (gear) + video-speed buttons: fixed to the actual top-end corner of the video
+        strip via ConstraintLayout, same pattern as mobile_shorts_back_btn above - NOT inside
+        lb_playback_transport_controls_row.xml, whose own root view is only as tall as its
+        content and gets vertically placed by Leanback's row-fragment machinery (so a
+        top-aligned view inside it ends up mid-screen, not at the true top of the video). Compact
+        mode only - see VideoPlayerGlue#getCompactOverflowActions/#getSpeedAction.
+        MobilePlaybackFragment resolves them via activity.findViewById() - id/class unchanged
+        from before, only their container moved.
+    -->
+    <ImageButton
+        android:id="@+id/mobile_speed_btn"
+        android:layout_width="58dp"
+        android:layout_height="58dp"
+        android:padding="12dp"
+        android:src="@drawable/action_video_speed"
+        android:background="@android:color/transparent"
+        android:scaleType="fitCenter"
+        android:visibility="gone"
+        android:contentDescription="@string/action_video_speed"
+        app:layout_constraintTop_toTopOf="@id/playback_controls_fragment"
+        app:layout_constraintEnd_toStartOf="@id/mobile_overflow_btn"
+        android:layout_marginTop="12dp" />
+
+    <ImageButton
+        android:id="@+id/mobile_overflow_btn"
+        android:layout_width="58dp"
+        android:layout_height="58dp"
+        android:padding="12dp"
+        android:src="@android:drawable/ic_menu_preferences"
+        android:background="@android:color/transparent"
+        android:scaleType="fitCenter"
+        android:visibility="gone"
+        android:contentDescription="@string/mobile_overflow_toggle"
+        app:layout_constraintTop_toTopOf="@id/playback_controls_fragment"
+        app:layout_constraintEnd_toEndOf="@id/playback_controls_fragment"
+        android:layout_marginTop="12dp"
+        android:layout_marginEnd="12dp" />
+
+    <!--
+        Fixed-position transport bar: seek bar + current/total time + play/pause/prev/next,
+        pinned to the actual bottom of the video strip via ConstraintLayout (same pattern as the
+        overflow/speed buttons above), replacing the equivalent content that used to live inside
+        lb_playback_transport_controls_row.xml. That row is rendered by Leanback's
+        PlaybackSupportFragment/VerticalGridView machinery, which is tuned for the TV case (a
+        controls row sitting above a shelf of related-video rows) and does not reliably pin a
+        lone row to the true bottom of the video on a phone - see
+        MobilePlaybackFragment#initFixedTransportViews/FixedTransportController for the data
+        wiring (polls VideoPlayerGlue#getControlsRow() rather than a second push-listener, since
+        PlaybackControlsRow only supports a single progress-change listener and
+        PlaybackTransportRowPresenter already owns that slot).
+        The old row's own seek bar/time/transport buttons are hidden (not removed - the row still
+        carries the title/description block) once this bar takes over; see
+        MobilePlaybackFragment#hideLegacyTransportRowParts. Compact mode only, same as the
+        overflow/speed buttons; Shorts keeps its own seek bar (setShortsChrome), so this bar stays
+        gone there.
+    -->
+    <LinearLayout
+        android:id="@+id/mobile_transport_buttons"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:visibility="gone"
+        app:layout_constraintStart_toStartOf="@id/playback_controls_fragment"
+        app:layout_constraintEnd_toEndOf="@id/playback_controls_fragment"
+        app:layout_constraintHorizontal_bias="0.5"
+        app:layout_constraintTop_toTopOf="@id/playback_controls_fragment"
+        app:layout_constraintBottom_toTopOf="@id/mobile_seek_row"
+        app:layout_constraintVertical_bias="0.5">
+
+        <ImageButton
+            android:id="@+id/mobile_prev_btn"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:padding="14dp"
+            android:src="@android:drawable/ic_media_previous"
+            android:background="@android:color/transparent"
+            android:scaleType="fitCenter"
+            android:contentDescription="@string/lb_playback_controls_skip_previous" />
+
+        <ImageButton
+            android:id="@+id/mobile_play_pause_btn"
+            android:layout_width="80dp"
+            android:layout_height="80dp"
+            android:padding="14dp"
+            android:src="@drawable/ic_shorts_pause"
+            android:background="@android:color/transparent"
+            android:scaleType="fitCenter"
+            android:contentDescription="@string/lb_playback_controls_play" />
+
+        <ImageButton
+            android:id="@+id/mobile_next_btn"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:padding="14dp"
+            android:src="@android:drawable/ic_media_next"
+            android:background="@android:color/transparent"
+            android:scaleType="fitCenter"
+            android:contentDescription="@string/lb_playback_controls_skip_next" />
+    </LinearLayout>
+
+    <!-- Fullscreen toggle: fixed above the time row, end-aligned - moved out of the Leanback row
+         (lb_playback_transport_controls_row.xml) for the same reason as the fixed seek/time/
+         transport views above: that row doesn't reliably land at a fixed screen position on a
+         phone. Its own row (not sharing mobile_time_row) so mobile_total_time can align flush
+         with the seek bar's own end edge below it. -->
+    <ImageButton
+        android:id="@+id/mobile_fullscreen_btn"
+        android:layout_width="55dp"
+        android:layout_height="55dp"
+        android:padding="7dp"
+        android:src="@drawable/ic_fullscreen_enter"
+        android:background="@android:color/transparent"
+        android:scaleType="fitCenter"
+        android:visibility="invisible"
+        android:contentDescription="@string/mobile_fullscreen_toggle"
+        app:layout_constraintEnd_toEndOf="@id/mobile_seek_row"
+        app:layout_constraintBottom_toTopOf="@id/mobile_time_row"
+        android:layout_marginEnd="0dp" />
+
+    <!-- Fixed-position time row: current time (start) / total time (end, flush with the seek
+         bar's own end edge below it) directly above the seek bar, which is the last element and
+         hugs the actual bottom edge of the video strip. -->
+    <RelativeLayout
+        android:id="@+id/mobile_time_row"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layoutDirection="ltr"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
+        android:visibility="gone"
+        app:layout_constraintStart_toStartOf="@id/mobile_seek_row"
+        app:layout_constraintEnd_toEndOf="@id/mobile_seek_row"
+        app:layout_constraintBottom_toTopOf="@id/mobile_seek_row">
+
+        <TextView
+            android:id="@+id/mobile_current_time"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentStart="true"
+            android:textColor="@android:color/white"
+            android:textSize="14sp"
+            android:shadowColor="#CC000000"
+            android:shadowRadius="3"
+            android:text="0:00" />
+
+        <TextView
+            android:id="@+id/mobile_total_time"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentEnd="true"
+            android:textColor="@android:color/white"
+            android:textSize="14sp"
+            android:shadowColor="#CC000000"
+            android:shadowRadius="3"
+            android:text="0:00" />
+    </RelativeLayout>
+
+    <RelativeLayout
+        android:id="@+id/mobile_seek_row"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        app:layout_constraintStart_toStartOf="@id/playback_controls_fragment"
+        app:layout_constraintEnd_toEndOf="@id/playback_controls_fragment"
+        app:layout_constraintBottom_toBottomOf="@id/playback_controls_fragment"
+        android:layout_marginBottom="2dp">
+
+        <SeekBar
+            android:id="@+id/mobile_seek_bar"
+            android:layout_width="match_parent"
+            android:layout_height="32dp"
+            android:layout_centerVertical="true"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:paddingTop="0dp"
+            android:paddingBottom="0dp"
+            android:max="1000"
+            android:progressDrawable="@drawable/mobile_seek_bar_progress"
+            android:thumb="@drawable/mobile_seek_bar_thumb"
+            android:thumbOffset="0dp" />
+    </RelativeLayout>
+
+    <!--
+        Shorts overlay: centred play/pause indicator (not interactive — tap-anywhere logic in
+        MobilePlaybackFragment.handleShortsTouchEvent shows/fades this icon on each tap).
+    -->
+    <ImageView
+        android:id="@+id/mobile_shorts_play_pause_btn"
+        android:layout_width="72dp"
+        android:layout_height="72dp"
+        android:src="@drawable/ic_shorts_play"
+        android:scaleType="center"
+        android:clickable="false"
+        android:focusable="false"
+        android:visibility="invisible"
+        app:layout_constraintTop_toTopOf="@id/playback_controls_fragment"
+        app:layout_constraintBottom_toBottomOf="@id/playback_controls_fragment"
+        app:layout_constraintStart_toStartOf="@id/playback_controls_fragment"
+        app:layout_constraintEnd_toEndOf="@id/playback_controls_fragment" />
+
+    <!--
+        Shorts info bar: title + channel name shown BELOW the 9:16 video strip.
+        Always visible while in Shorts mode (does not auto-hide). Replaces the regular
+        up-next panel for Shorts; hidden when the regular panel is shown.
+    -->
+    <LinearLayout
+        android:id="@+id/mobile_shorts_info_bar"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:orientation="vertical"
+        android:visibility="gone"
+        android:paddingStart="16dp"
+        android:paddingEnd="80dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="16dp"
+        app:layout_constraintTop_toBottomOf="@id/playback_controls_fragment"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/mobile_shorts_nav_bar">
+
+        <TextView
+            android:id="@+id/shorts_bar_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@android:color/white"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:maxLines="2"
+            android:ellipsize="end" />
+
+        <TextView
+            android:id="@+id/shorts_bar_channel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingTop="4dp"
+            android:textColor="#FFAAAAAA"
+            android:textSize="16sp"
+            android:maxLines="1"
+            android:ellipsize="end" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/mobile_below_video_panel"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:orientation="vertical"
+        app:layout_constraintTop_toBottomOf="@id/playback_controls_fragment"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent">
+
+        <!-- Title row; tapping it toggles the description below (chevron flips). -->
+        <LinearLayout
+            android:id="@+id/mobile_video_title_row"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="16dp"
+            android:paddingEnd="12dp"
+            android:paddingTop="12dp"
+            android:background="?android:attr/selectableItemBackground">
+
+            <TextView
+                android:id="@+id/mobile_video_title"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textColor="@android:color/white"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:maxLines="2"
+                android:ellipsize="end" />
+
+            <TextView
+                android:id="@+id/mobile_video_expand"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingStart="12dp"
+                android:paddingEnd="4dp"
+                android:textColor="#FFCCCCCC"
+                android:textSize="26sp"
+                android:text="▾" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/mobile_video_description"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingTop="8dp"
+            android:textColor="#FFDDDDDD"
+            android:textSize="16sp"
+            android:lineSpacingExtra="4dp"
+            android:maxLines="12"
+            android:scrollbars="vertical"
+            android:visibility="gone" />
+
+        <!--
+            Meta block: a 2-row grid. Row 1 = channel name | views; row 2 = subscribers | like/dislike.
+            Fixed line heights (26dp / 24dp) on both columns guarantee the rows line up across the
+            gap; the avatar spans both rows and is vertically centred against them.
+        -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="16dp"
+            android:paddingEnd="12dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="10dp">
+
+            <LinearLayout
+                android:id="@+id/mobile_video_channel_row"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="?android:attr/selectableItemBackground">
+
+                <ImageView
+                    android:id="@+id/mobile_video_channel_avatar"
+                    android:layout_width="46dp"
+                    android:layout_height="46dp"
+                    android:background="@drawable/avatar_circle_bg"
+                    android:scaleType="centerCrop"
+                    android:contentDescription="@string/channel_avatar"
+                    android:layout_marginEnd="12dp"
+                    android:visibility="gone" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/mobile_video_channel"
+                        android:layout_width="match_parent"
+                        android:layout_height="28dp"
+                        android:gravity="center_vertical"
+                        android:textColor="@android:color/white"
+                        android:textSize="18sp"
+                        android:maxLines="1"
+                        android:ellipsize="end" />
+
+                    <TextView
+                        android:id="@+id/mobile_video_subs"
+                        android:layout_width="match_parent"
+                        android:layout_height="26dp"
+                        android:gravity="center_vertical"
+                        android:textColor="#FFAAAAAA"
+                        android:textSize="15sp"
+                        android:maxLines="1"
+                        android:ellipsize="end" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingStart="12dp"
+                android:gravity="end">
+
+                <TextView
+                    android:id="@+id/mobile_video_views"
+                    android:layout_width="wrap_content"
+                    android:layout_height="28dp"
+                    android:gravity="center_vertical|end"
+                    android:textColor="@android:color/white"
+                    android:textSize="17sp"
+                    android:maxLines="1"
+                    android:ellipsize="end" />
+
+                <!-- Like/dislike replace the plain stats text — tappable, count turns blue when active. -->
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="26dp"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical|end">
+
+                    <TextView
+                        android:id="@+id/mobile_video_like_btn"
+                        android:layout_width="wrap_content"
+                        android:layout_height="match_parent"
+                        android:minWidth="56dp"
+                        android:gravity="center"
+                        android:paddingStart="4dp"
+                        android:paddingEnd="14dp"
+                        android:textSize="17sp"
+                        android:textColor="#FFAAAAAA"
+                        android:background="?android:attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="Like" />
+
+                    <TextView
+                        android:id="@+id/mobile_video_dislike_btn"
+                        android:layout_width="wrap_content"
+                        android:layout_height="match_parent"
+                        android:minWidth="44dp"
+                        android:gravity="center"
+                        android:paddingStart="4dp"
+                        android:paddingEnd="4dp"
+                        android:textSize="17sp"
+                        android:textColor="#FFAAAAAA"
+                        android:background="?android:attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="Dislike" />
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#22FFFFFF" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/mobile_up_next_list"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:paddingTop="6dp" />
+    </LinearLayout>
+
+    <!--
+        Shorts bottom navigation bar: Home / Music / History. Same layout/styling as the Home
+        screen's mobile_bottom_nav_bar (mobile_browse_fragment.xml) - a color selector on the
+        icon/text tint marks the active tab - so the bar reads identically everywhere in the
+        app. Visible in strip mode (portrait, or any non-full-screen player state); managed by
+        MobilePlaybackFragment.applyMobileLayout().
+    -->
+    <LinearLayout
+        android:id="@+id/mobile_shorts_nav_bar"
+        android:layout_width="0dp"
+        android:layout_height="@dimen/mobile_bottom_nav_bar_height"
+        android:orientation="horizontal"
+        android:visibility="gone"
+        android:background="@color/mobile_surface"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <LinearLayout
+            android:id="@+id/shorts_nav_home"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:background="?android:attr/selectableItemBackground">
+            <ImageView android:layout_width="24dp" android:layout_height="24dp"
+                android:src="@drawable/ic_shorts_nav_home"
+                android:tint="@color/bottom_nav_icon_color"
+                android:duplicateParentState="true"/>
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:paddingTop="2dp"
+                android:textSize="11sp" android:text="@string/header_home"
+                android:textColor="@color/bottom_nav_icon_color"
+                android:duplicateParentState="true"/>
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/shorts_nav_music"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:background="?android:attr/selectableItemBackground">
+            <ImageView android:layout_width="24dp" android:layout_height="24dp"
+                android:src="@drawable/icon_music"
+                android:tint="@color/bottom_nav_icon_color"
+                android:duplicateParentState="true"/>
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:paddingTop="2dp"
+                android:textSize="11sp" android:text="@string/header_music"
+                android:textColor="@color/bottom_nav_icon_color"
+                android:duplicateParentState="true"/>
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/shorts_nav_history"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:background="?android:attr/selectableItemBackground">
+            <ImageView android:layout_width="24dp" android:layout_height="24dp"
+                android:src="@drawable/ic_shorts_nav_history"
+                android:tint="@color/bottom_nav_icon_color"
+                android:duplicateParentState="true"/>
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:paddingTop="2dp"
+                android:textSize="11sp" android:text="@string/header_history"
+                android:textColor="@color/bottom_nav_icon_color"
+                android:duplicateParentState="true"/>
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!--
+        Semi-transparent scrim above the "You" profile sheet (covers everything down to the top of
+        the sheet, leaving the nav bar bright). Tap-to-dismiss is handled in
+        MobilePlaybackFragment.handleShortsTouchEvent (the activity intercepts touches in Shorts
+        mode, so the scrim's own onClick can't fire).
+    -->
+    <View
+        android:id="@+id/mobile_shorts_profile_scrim"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="#99000000"
+        android:visibility="gone"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/mobile_shorts_profile_sheet"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!--
+        "You" profile sheet: drag handle + account header + navigation rows.
+        Slides up from the bottom (sitting just above the nav bar) when "You" is tapped.
+    -->
+    <LinearLayout
+        android:id="@+id/mobile_shorts_profile_sheet"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@android:color/black"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/mobile_shorts_nav_bar"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <!-- Drag handle: tap to close. -->
+        <FrameLayout
+            android:id="@+id/profile_sheet_handle"
+            android:layout_width="match_parent"
+            android:layout_height="26dp"
+            android:background="?android:attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true">
+            <View
+                android:layout_width="36dp"
+                android:layout_height="4dp"
+                android:layout_gravity="center"
+                android:background="#66FFFFFF" />
+        </FrameLayout>
+
+        <!-- Account header: avatar + name + email -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="72dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp">
+
+            <ImageView
+                android:id="@+id/profile_avatar"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:scaleType="centerCrop" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:paddingStart="12dp">
+                <TextView
+                    android:id="@+id/profile_name"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="@android:color/white"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:text="Account" />
+                <TextView
+                    android:id="@+id/profile_email"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="#FFAAAAAA"
+                    android:textSize="13sp"
+                    android:text="" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <View android:layout_width="match_parent" android:layout_height="1dp"
+            android:background="#22FFFFFF" />
+
+        <!-- My Channel -->
+        <LinearLayout
+            android:id="@+id/profile_row_channel"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="16dp"
+            android:background="?android:attr/selectableItemBackground">
+            <TextView android:layout_width="28dp" android:layout_height="wrap_content"
+                android:gravity="center" android:textSize="20sp" android:text="📺"/>
+            <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:paddingStart="12dp"
+                android:textColor="@android:color/white" android:textSize="15sp"
+                android:text="My channel"/>
+        </LinearLayout>
+
+        <!-- History -->
+        <LinearLayout
+            android:id="@+id/profile_row_history"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="16dp"
+            android:background="?android:attr/selectableItemBackground">
+            <TextView android:layout_width="28dp" android:layout_height="wrap_content"
+                android:gravity="center" android:textSize="20sp" android:text="🕐"/>
+            <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:paddingStart="12dp"
+                android:textColor="@android:color/white" android:textSize="15sp"
+                android:text="History"/>
+        </LinearLayout>
+
+        <!-- Playlists -->
+        <LinearLayout
+            android:id="@+id/profile_row_playlists"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="16dp"
+            android:background="?android:attr/selectableItemBackground">
+            <TextView android:layout_width="28dp" android:layout_height="wrap_content"
+                android:gravity="center" android:textSize="20sp" android:text="📝"/>
+            <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:paddingStart="12dp"
+                android:textColor="@android:color/white" android:textSize="15sp"
+                android:text="Playlists"/>
+        </LinearLayout>
+
+        <!-- Settings -->
+        <LinearLayout
+            android:id="@+id/profile_row_settings"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="16dp"
+            android:background="?android:attr/selectableItemBackground">
+            <TextView android:layout_width="28dp" android:layout_height="wrap_content"
+                android:gravity="center" android:textSize="20sp" android:text="⚙"/>
+            <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:paddingStart="12dp"
+                android:textColor="@android:color/white" android:textSize="15sp"
+                android:text="Settings"/>
+        </LinearLayout>
+    </LinearLayout>
+
+    <!--
+        Semi-transparent scrim above the "Save to playlist" panel (mirrors mobile_shorts_profile_scrim).
+        Tap-to-dismiss handled in MobilePlaybackFragment.handleShortsTouchEvent.
+    -->
+    <View
+        android:id="@+id/mobile_shorts_playlist_scrim"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="#99000000"
+        android:visibility="gone"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/mobile_shorts_playlist_sheet"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!--
+        "Save to playlist" panel: drag handle + title + scrollable checklist of the user's playlists.
+        Slides up from the bottom (sitting just above the nav bar) when the "Playlists" nav bar tab
+        is tapped, mirroring the "You" profile sheet. Grows with content but is capped by
+        MobilePlaybackFragment.capShortsPlaylistScrollHeight() to the space between the bottom of the
+        video and the top of the nav bar (so in the portrait strip it never grows up over the
+        video); overflow scrolls inside playlist_sheet_scroll instead of pushing the panel taller.
+    -->
+    <LinearLayout
+        android:id="@+id/mobile_shorts_playlist_sheet"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@android:color/black"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/mobile_shorts_nav_bar"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <!-- Drag handle: tap to close. -->
+        <FrameLayout
+            android:id="@+id/playlist_sheet_handle"
+            android:layout_width="match_parent"
+            android:layout_height="26dp"
+            android:background="?android:attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true">
+            <View
+                android:layout_width="36dp"
+                android:layout_height="4dp"
+                android:layout_gravity="center"
+                android:background="#66FFFFFF" />
+        </FrameLayout>
+
+        <TextView
+            android:id="@+id/playlist_sheet_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingBottom="10dp"
+            android:textColor="@android:color/white"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:text="Save to playlist" />
+
+        <View android:layout_width="match_parent" android:layout_height="1dp"
+            android:background="#22FFFFFF" />
+
+        <ScrollView
+            android:id="@+id/playlist_sheet_scroll"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:scrollbars="vertical">
+
+            <LinearLayout
+                android:id="@+id/playlist_sheet_list"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+        </ScrollView>
+
+        <TextView
+            android:id="@+id/playlist_sheet_empty"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="16dp"
+            android:textColor="#FFAAAAAA"
+            android:textSize="14sp"
+            android:visibility="gone"
+            android:text="No playlists yet" />
+    </LinearLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>

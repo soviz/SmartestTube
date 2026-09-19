@@ -4,7 +4,10 @@
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="4dp"
+    android:paddingStart="4dp"
+    android:paddingEnd="4dp"
+    android:paddingTop="4dp"
+    android:paddingBottom="16dp"
     android:clickable="true"
     android:focusable="true"
     android:background="?android:attr/selectableItemBackground">
@@ -68,8 +71,12 @@
             android:maxWidth="140dp"
             android:singleLine="true"
             android:ellipsize="end"
-            android:textColor="@color/mobile_text_secondary"
-            android:textSize="11sp" />
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?android:attr/selectableItemBackground"
+            android:textColor="@color/mobile_accent"
+            android:textStyle="bold"
+            android:textSize="13sp" />
 
         <!-- View count + publish date, e.g. "1.2M views • 3 days ago". -->
         <TextView
@@ -80,7 +87,7 @@
             android:singleLine="true"
             android:ellipsize="end"
             android:textColor="@color/mobile_text_secondary"
-            android:textSize="11sp"
+            android:textSize="13sp"
             android:visibility="gone" />
     </LinearLayout>
 </LinearLayout>

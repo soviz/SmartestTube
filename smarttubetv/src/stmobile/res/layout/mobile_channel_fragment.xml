@@ -71,8 +71,10 @@
     </LinearLayout>
 
     <!--
-        Channel identity header: circular avatar + subscriber count. Hidden until the first
-        upload's metadata resolves (see MobileChannelFragment.maybeResolveSubscribedState).
+        Channel identity header: circular avatar + subscriber count. Shown immediately with a
+        placeholder avatar and reserves its final height up front, so filling it in once the
+        first upload's metadata resolves (see MobileChannelFragment.maybeResolveSubscribedState)
+        doesn't shift the content below it.
     -->
     <LinearLayout
         android:id="@+id/channel_header"
@@ -83,8 +85,7 @@
         android:paddingStart="16dp"
         android:paddingEnd="16dp"
         android:paddingTop="12dp"
-        android:paddingBottom="12dp"
-        android:visibility="gone">
+        android:paddingBottom="12dp">
 
         <ImageView
             android:id="@+id/channel_avatar"
