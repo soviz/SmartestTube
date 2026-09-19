@@ -3,8 +3,13 @@
     stmobile override of the player transport row (main: time/remaining info BELOW the seek bar,
     large TV text, generous bottom padding). Phone tweaks, YouTube-style:
       - the seek bar is the LAST element, hugging the bottom edge of the video;
-      - the time block (Remaining + current/total) sits ABOVE the seek bar at half the TV size;
+      - current/total time shares a row with the fullscreen toggle (time start-aligned,
+        fullscreen end-aligned) directly above the seek bar, at half the TV text size;
       - minimal bottom padding.
+    Overflow (gear) + speed buttons are NOT here — this row's own root view is only as tall as
+    its content and gets vertically placed by Leanback's row-fragment machinery, so a
+    top-aligned view inside it doesn't land at the true top of the video. They live in
+    fragment_playback.xml instead, fixed via ConstraintLayout to the actual top-end corner.
     All view ids must be kept — PlaybackTransportRowPresenter resolves them by id.
 -->
 <LinearLayout
@@ -72,98 +77,6 @@
                 style="?attr/playbackControlsTimeStyle" />
         </LinearLayout>
 
-        <!-- Overflow (gear) + video-speed buttons: pinned to the actual top-end CORNER of the
-             video strip (this FrameLayout spans the full video height) - not the small
-             wrap_content row below that only wraps Previous/Play/Next and sits vertically
-             centered in the strip. Compact mode only - see VideoPlayerGlue
-             #getCompactOverflowActions/#getSpeedAction. MobilePlaybackFragment still resolves
-             them via activity.findViewById() - id/class unchanged, only their position in the
-             tree moved. -->
-        <RelativeLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="top|end"
-            android:layoutDirection="ltr"
-            tools:ignore="RtlHardcoded" >
-            <ImageButton
-                android:id="@+id/mobile_overflow_btn"
-                android:layout_width="@dimen/lb_fullscreen_button_size"
-                android:layout_height="@dimen/lb_fullscreen_button_size"
-                android:layout_alignParentEnd="true"
-                android:padding="@dimen/lb_fullscreen_button_padding"
-                android:src="@android:drawable/ic_menu_preferences"
-                android:background="@android:color/transparent"
-                android:scaleType="fitCenter"
-                android:visibility="gone"
-                android:contentDescription="@string/mobile_overflow_toggle" />
-
-            <ImageButton
-                android:id="@+id/mobile_speed_btn"
-                android:layout_width="@dimen/lb_fullscreen_button_size"
-                android:layout_height="@dimen/lb_fullscreen_button_size"
-                android:layout_toStartOf="@id/mobile_overflow_btn"
-                android:padding="@dimen/lb_fullscreen_button_padding"
-                android:src="@drawable/action_video_speed"
-                android:background="@android:color/transparent"
-                android:scaleType="fitCenter"
-                android:visibility="gone"
-                android:contentDescription="@string/action_video_speed" />
-        </RelativeLayout>
-
-        <!-- Phone: only current/total time shown, pinned to the actual bottom-start CORNER of
-             the video strip (near the seek bar). ending_time/quality_info/date_time are kept in
-             the tree (PlaybackTransportRowPresenter resolves them by id and writes to them
-             unconditionally) but collapsed to zero size elsewhere - per feedback,
-             Remaining/quality/date-time clutter the video on a phone. -->
-        <RelativeLayout android:id="@+id/time_info"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_gravity="bottom|start"
-                        android:layoutDirection="ltr"
-                        android:focusable="false"
-                        tools:ignore="RtlHardcoded" >
-            <TextView
-                android:id="@+id/ending_time"
-                android:layout_width="0dp"
-                android:layout_height="0dp"
-                android:visibility="gone"
-                style="?attr/playbackControlsTimeStyle" />
-
-            <RelativeLayout android:id="@+id/current_time_wrapper"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layoutDirection="ltr"
-                            android:layout_alignParentEnd="true"
-                            android:focusable="false" >
-                <TextView
-                    android:id="@+id/current_time"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_toStartOf="@+id/separate_time"
-                    android:layout_marginStart="@dimen/lb_playback_transport_time_margin"
-                    android:textSize="11sp"
-                    style="?attr/playbackControlsTimeStyle" />
-
-                <TextView
-                    android:id="@+id/separate_time"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/lb_playback_time_separator"
-                    android:layout_toStartOf="@+id/total_time"
-                    android:layout_marginStart="@dimen/lb_playback_transport_time_margin"
-                    android:textSize="11sp"
-                    style="?attr/playbackControlsTimeStyle" />
-
-                <TextView
-                    android:id="@+id/total_time"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_alignParentEnd="true"
-                    android:layout_marginStart="@dimen/lb_playback_transport_time_margin"
-                    android:textSize="11sp"
-                    style="?attr/playbackControlsTimeStyle" />
-            </RelativeLayout>
-        </RelativeLayout>
     </FrameLayout>
 
     <!-- Phone: no side padding on the row itself — the seek bar runs edge-to-edge; the
@@ -243,6 +156,60 @@
                 android:layout_alignParentStart="true"
                 android:layout_centerVertical="true" >
             </FrameLayout>
+
+            <!-- Phone: only current/total time shown, sharing this row with the fullscreen
+                 toggle - start-aligned, vertically centered. ending_time/quality_info/date_time
+                 are kept in the tree (PlaybackTransportRowPresenter resolves them by id and
+                 writes to them unconditionally) but collapsed to zero size elsewhere - per
+                 feedback, Remaining/quality/date-time clutter the video on a phone. -->
+            <RelativeLayout android:id="@+id/time_info"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_centerVertical="true"
+                            android:layout_alignParentStart="true"
+                            android:layoutDirection="ltr"
+                            android:focusable="false"
+                            tools:ignore="RtlHardcoded" >
+                <TextView
+                    android:id="@+id/ending_time"
+                    android:layout_width="0dp"
+                    android:layout_height="0dp"
+                    android:visibility="gone"
+                    style="?attr/playbackControlsTimeStyle" />
+
+                <RelativeLayout android:id="@+id/current_time_wrapper"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layoutDirection="ltr"
+                                android:focusable="false" >
+                    <TextView
+                        android:id="@+id/current_time"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_toStartOf="@+id/separate_time"
+                        android:textSize="11sp"
+                        style="?attr/playbackControlsTimeStyle" />
+
+                    <TextView
+                        android:id="@+id/separate_time"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/lb_playback_time_separator"
+                        android:layout_toStartOf="@+id/total_time"
+                        android:layout_marginStart="@dimen/lb_playback_transport_time_margin"
+                        android:textSize="11sp"
+                        style="?attr/playbackControlsTimeStyle" />
+
+                    <TextView
+                        android:id="@+id/total_time"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentEnd="true"
+                        android:layout_marginStart="@dimen/lb_playback_transport_time_margin"
+                        android:textSize="11sp"
+                        style="?attr/playbackControlsTimeStyle" />
+                </RelativeLayout>
+            </RelativeLayout>
 
             <ImageButton
                 android:id="@+id/mobile_fullscreen_btn"

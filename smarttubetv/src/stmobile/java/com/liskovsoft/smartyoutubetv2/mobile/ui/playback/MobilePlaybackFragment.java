@@ -115,6 +115,9 @@ public class MobilePlaybackFragment extends PlaybackFragment {
     private ImageButton mFullscreenBtn;
     private ImageButton mOverflowBtn;
     private ImageButton mSpeedBtn;
+    /** Open overflow (gear) popup, if any - dismissed when the controls overlay hides (see
+     *  {@link #hideControlsOverlay}) so it never lingers over a faded/gone player. */
+    private android.widget.PopupMenu mOverflowPopup;
     private LinearLayout mShortsInfoBar;
     private TextView mShortsTitleView;
     private TextView mShortsChannelView;
@@ -969,7 +972,10 @@ public class MobilePlaybackFragment extends PlaybackFragment {
                 }
             }
         }
-        // Same lazy-inflate re-resolve for the overflow (gear) button.
+        // mobile_overflow_btn/mobile_speed_btn live in fragment_playback.xml (fixed to the
+        // video strip's top-end corner via ConstraintLayout, not the lazily-inflated Leanback
+        // row), so initPanelViews() already binds them on fragment creation. This is just a
+        // defensive re-resolve in case that first lookup ran before mRoot was ready.
         if (mOverflowBtn == null) {
             Activity activity = getActivity();
             if (activity != null) {
@@ -979,7 +985,6 @@ public class MobilePlaybackFragment extends PlaybackFragment {
                 }
             }
         }
-        // Same lazy-inflate re-resolve for the dedicated video-speed button.
         if (mSpeedBtn == null) {
             Activity activity = getActivity();
             if (activity != null) {
@@ -1007,6 +1012,7 @@ public class MobilePlaybackFragment extends PlaybackFragment {
         // Leanback hide here (used by e.g. PlayerUIController's auto-hide) avoids the translate
         // animation that left the seek bar stuck near the top of the screen.
         if (mLayoutState == 2) return;
+        if (mOverflowPopup != null) mOverflowPopup.dismiss();
         if (mShortsBackBtn != null) mShortsBackBtn.setVisibility(View.INVISIBLE);
         if (mFullscreenBtn != null) mFullscreenBtn.setVisibility(View.INVISIBLE);
         if (mOverflowBtn != null) mOverflowBtn.setVisibility(View.INVISIBLE);
@@ -1614,6 +1620,10 @@ public class MobilePlaybackFragment extends PlaybackFragment {
             glue.performOverflowAction(action);
             return true;
         });
+        popup.setOnDismissListener(menu -> {
+            if (mOverflowPopup == menu) mOverflowPopup = null;
+        });
+        mOverflowPopup = popup;
         popup.show();
     }
 
@@ -1882,7 +1892,9 @@ public class MobilePlaybackFragment extends PlaybackFragment {
 
         // Overflow (gear) button: shows the compact-mode-only actions (repeat, chat, subtitles,
         // video-off, HQ) in a popup menu instead of crowding the secondary row. See
-        // VideoPlayerGlue#getCompactOverflowActions.
+        // VideoPlayerGlue#getCompactOverflowActions. Fixed to the video strip's top-end corner
+        // in fragment_playback.xml (not the Leanback controls row - see that layout's header
+        // comment for why).
         mOverflowBtn = activity.findViewById(R.id.mobile_overflow_btn);
         if (mOverflowBtn != null) {
             mOverflowBtn.setOnClickListener(this::showOverflowMenu);

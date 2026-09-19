@@ -111,6 +111,45 @@
     -->
 
     <!--
+        Overflow (gear) + video-speed buttons: fixed to the actual top-end corner of the video
+        strip via ConstraintLayout, same pattern as mobile_shorts_back_btn above - NOT inside
+        lb_playback_transport_controls_row.xml, whose own root view is only as tall as its
+        content and gets vertically placed by Leanback's row-fragment machinery (so a
+        top-aligned view inside it ends up mid-screen, not at the true top of the video). Compact
+        mode only - see VideoPlayerGlue#getCompactOverflowActions/#getSpeedAction.
+        MobilePlaybackFragment resolves them via activity.findViewById() - id/class unchanged
+        from before, only their container moved.
+    -->
+    <ImageButton
+        android:id="@+id/mobile_speed_btn"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:padding="8dp"
+        android:src="@drawable/action_video_speed"
+        android:background="@android:color/transparent"
+        android:scaleType="fitCenter"
+        android:visibility="gone"
+        android:contentDescription="@string/action_video_speed"
+        app:layout_constraintTop_toTopOf="@id/playback_controls_fragment"
+        app:layout_constraintEnd_toStartOf="@id/mobile_overflow_btn"
+        android:layout_marginTop="8dp" />
+
+    <ImageButton
+        android:id="@+id/mobile_overflow_btn"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:padding="8dp"
+        android:src="@android:drawable/ic_menu_preferences"
+        android:background="@android:color/transparent"
+        android:scaleType="fitCenter"
+        android:visibility="gone"
+        android:contentDescription="@string/mobile_overflow_toggle"
+        app:layout_constraintTop_toTopOf="@id/playback_controls_fragment"
+        app:layout_constraintEnd_toEndOf="@id/playback_controls_fragment"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="8dp" />
+
+    <!--
         Shorts overlay: centred play/pause indicator (not interactive — tap-anywhere logic in
         MobilePlaybackFragment.handleShortsTouchEvent shows/fades this icon on each tap).
     -->
