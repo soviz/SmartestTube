@@ -139,6 +139,26 @@ public class MobilePlaybackActivity extends PlaybackActivity {
     }
 
     /**
+     * PIP-close fix: don't relaunch Home when the PIP window is dismissed (the X) or when Back
+     * finishes the player normally.
+     *
+     * {@code LeanbackActivity.finishReally()} calls {@code getViewManager().startParentView(this)}
+     * before tearing the activity down - a TV-only need, since TV activities are
+     * {@code singleInstance} (each in its own task) and Back has nothing to reveal without
+     * explicitly launching the parent. On the phone all activities share (or, for the player, sit
+     * on top of) one task, so Android already reveals whatever was underneath once this activity
+     * finishes; {@code startParentView} is not just redundant here, it actively breaks navigation:
+     * it does a blind {@code Stack.pop()} on the ViewManager's activity stack, which - if the
+     * player was already removed from that stack on PIP entry (see {@link #startParentViewOnPip()})
+     * - pops whatever real caller (e.g. Search) is now on top instead, so the fallback to the
+     * hardcoded default parent (Home) kicks in and Home opens instead of the caller.
+     */
+    @Override
+    protected boolean shouldStartParentViewOnFinish() {
+        return false;
+    }
+
+    /**
      * PIP fix (#33): don't relaunch Home when the player drops into PIP.
      *
      * The shared base launches the parent activity here. On the phone, Home

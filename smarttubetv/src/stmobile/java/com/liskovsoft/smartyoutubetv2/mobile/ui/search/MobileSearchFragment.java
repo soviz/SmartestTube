@@ -25,7 +25,6 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
-import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
@@ -50,8 +49,8 @@ import java.util.Map;
  * filter dialog are all reused from the TV code; only the view layer is new.
  *
  * The toolbar holds the query field; below it the screen shows either query suggestions
- * (while typing) or a 2-column grid of results (after a search). Results from every
- * search group are flattened into one grid, keyed by group id so a continuation replaces
+ * (while typing) or a full-width column of results (after a search). Results from every
+ * search group are flattened into one list, keyed by group id so a continuation replaces
  * just its own slice.
  */
 public class MobileSearchFragment extends Fragment implements SearchView {
@@ -101,10 +100,8 @@ public class MobileSearchFragment extends Fragment implements SearchView {
         view.findViewById(R.id.btn_clear).setOnClickListener(v -> mSearchInput.setText(""));
         view.findViewById(R.id.btn_voice).setOnClickListener(v -> startVoiceRecognition());
 
-        int span = getResources().getInteger(R.integer.mobile_grid_span);
-        int cardWidth = getResources().getDisplayMetrics().widthPixels / span;
-        mResultsAdapter = new VideoCardAdapter(cardWidth, mVideoClick, mVideoLongClick);
-        mResultsList.setLayoutManager(new GridLayoutManager(getContext(), span));
+        mResultsAdapter = new VideoCardAdapter(screenWidthPx(), mVideoClick, mVideoLongClick);
+        mResultsList.setLayoutManager(new LinearLayoutManager(getContext()));
         mResultsList.setAdapter(mResultsAdapter);
         mResultsList.addOnScrollListener(mScrollListener);
 
@@ -388,17 +385,17 @@ public class MobileSearchFragment extends Fragment implements SearchView {
     };
 
     // Hosting activity declares configChanges="orientation|..." so it is NOT recreated on
-    // rotation; re-read the grid span (values-sw600dp-land widens it) and resize cards.
+    // rotation; re-read the screen width and resize cards (full-width column, span 1).
     @Override
     public void onConfigurationChanged(@NonNull Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
-        int span = getResources().getInteger(R.integer.mobile_grid_span);
-        if (mResultsList != null && mResultsList.getLayoutManager() instanceof GridLayoutManager) {
-            ((GridLayoutManager) mResultsList.getLayoutManager()).setSpanCount(span);
-        }
         if (mResultsAdapter != null) {
-            mResultsAdapter.setCardWidth(getResources().getDisplayMetrics().widthPixels / span);
+            mResultsAdapter.setCardWidth(screenWidthPx());
         }
+    }
+
+    private int screenWidthPx() {
+        return getResources().getDisplayMetrics().widthPixels;
     }
 
     private final VideoCardAdapter.OnVideoAction mVideoClick = video -> {
@@ -421,10 +418,10 @@ public class MobileSearchFragment extends Fragment implements SearchView {
                 return;
             }
             RecyclerView.LayoutManager lm = recyclerView.getLayoutManager();
-            if (!(lm instanceof GridLayoutManager)) {
+            if (!(lm instanceof LinearLayoutManager)) {
                 return;
             }
-            int lastVisible = ((GridLayoutManager) lm).findLastVisibleItemPosition();
+            int lastVisible = ((LinearLayoutManager) lm).findLastVisibleItemPosition();
             if (lastVisible >= mResultsAdapter.getItemCount() - 4) {
                 Video last = mResultsAdapter.getLast();
                 if (last != null && mPresenter != null) {

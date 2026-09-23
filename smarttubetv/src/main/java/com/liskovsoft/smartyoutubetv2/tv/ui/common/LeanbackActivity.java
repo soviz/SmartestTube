@@ -127,9 +127,23 @@ public abstract class LeanbackActivity extends MotherActivity {
 
     @Override
     public void finishReally() {
-        // Mandatory line. Fix un-proper view order (especially for playback view).
-        getViewManager().startParentView(this);
+        if (shouldStartParentViewOnFinish()) {
+            // Mandatory line. Fix un-proper view order (especially for playback view).
+            getViewManager().startParentView(this);
+        }
         super.finishReally();
+    }
+
+    /**
+     * TV activities are {@code singleInstance} (each in its own task), so Back has nothing to
+     * reveal without explicitly launching the parent via {@code startParentView}. The phone
+     * flavor overrides this to opt out: its activities share (or, for the player, sit on top of)
+     * one task, so Android already reveals whatever was underneath once this activity finishes -
+     * and for the player specifically, {@code startParentView}'s blind stack pop can steal the
+     * real caller (e.g. Search) off the ViewManager stack and fall back to launching Home instead.
+     */
+    protected boolean shouldStartParentViewOnFinish() {
+        return true;
     }
 
     private void finishTheApp() {

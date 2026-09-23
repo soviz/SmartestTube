@@ -269,6 +269,19 @@
             android:text="0:00" />
     </RelativeLayout>
 
+    <!-- Scrub preview thumbnail: positioned above the seek bar, follows the drag thumb's X via
+         MobilePlaybackFragment.FixedTransportController#updateSeekPreview. Hidden outside a drag. -->
+    <ImageView
+        android:id="@+id/mobile_seek_preview"
+        android:layout_width="160dp"
+        android:layout_height="90dp"
+        android:visibility="gone"
+        android:scaleType="centerCrop"
+        android:background="@android:color/black"
+        app:layout_constraintBottom_toTopOf="@id/mobile_seek_row"
+        app:layout_constraintStart_toStartOf="parent"
+        android:layout_marginBottom="8dp" />
+
     <RelativeLayout
         android:id="@+id/mobile_seek_row"
         android:layout_width="0dp"

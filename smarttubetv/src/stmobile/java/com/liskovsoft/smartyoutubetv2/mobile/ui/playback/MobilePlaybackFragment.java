@@ -144,6 +144,10 @@ public class MobilePlaybackFragment extends PlaybackFragment {
     private TextView mFixedTotalTime;
     private android.widget.SeekBar mFixedSeekBar;
     private FixedTransportController mFixedTransportController;
+    // Scrub preview thumbnail (storyboard-backed), shown only while dragging mFixedSeekBar.
+    private ImageView mFixedSeekPreview;
+    private com.liskovsoft.smartyoutubetv2.tv.ui.playback.previewtimebar.StoryboardManager mStoryboardManager;
+    private String mStoryboardVideoId;
 
     private LinearLayout mShortsInfoBar;
     private TextView mShortsTitleView;
@@ -289,6 +293,24 @@ public class MobilePlaybackFragment extends PlaybackFragment {
     public void onConfigurationChanged(Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
         applyMobileLayout();
+    }
+
+    @Override
+    public void loadStoryboard() {
+        super.loadStoryboard();
+
+        // Feeds the fixed seek bar's own scrub preview (FixedTransportController), same trigger
+        // (duration becomes known) and same data source (StoryboardManager) as the Leanback row's
+        // StoryboardSeekDataProvider that super.loadStoryboard() already primes.
+        if (mStoryboardManager != null) {
+            Video video = getVideo();
+            long durationMs = getDurationMs();
+            String videoId = video != null ? video.videoId : null;
+            if (durationMs > 0 && !java.util.Objects.equals(videoId, mStoryboardVideoId)) {
+                mStoryboardVideoId = videoId;
+                mStoryboardManager.init(video, durationMs);
+            }
+        }
     }
 
     @Override
@@ -2144,6 +2166,11 @@ public class MobilePlaybackFragment extends PlaybackFragment {
         mFixedCurrentTime = activity.findViewById(R.id.mobile_current_time);
         mFixedTotalTime = activity.findViewById(R.id.mobile_total_time);
         mFixedSeekBar = activity.findViewById(R.id.mobile_seek_bar);
+        mFixedSeekPreview = activity.findViewById(R.id.mobile_seek_preview);
+
+        if (mStoryboardManager == null) {
+            mStoryboardManager = new com.liskovsoft.smartyoutubetv2.tv.ui.playback.previewtimebar.StoryboardManager(activity);
+        }
 
         if (mFixedPrevBtn != null) {
             mFixedPrevBtn.setOnClickListener(v -> {
@@ -2243,6 +2270,10 @@ public class MobilePlaybackFragment extends PlaybackFragment {
         private boolean mUserDragging;
         private boolean mWasPlayingBeforeDrag;
         private boolean mRunning;
+        // Bumped on every scrub preview request so a stale Glide callback (a fast drag can queue
+        // many requests faster than the storyboard image group loads) can tell it's no longer the
+        // latest one and skip applying its bitmap instead of flashing through every frame it passed.
+        private int mPreviewRequestId;
 
         private final Runnable mPoll = new Runnable() {
             @Override
@@ -2304,6 +2335,7 @@ public class MobilePlaybackFragment extends PlaybackFragment {
             }
             long targetMs = Math.round(progress * durationMs / 1000.0);
             if (mFixedCurrentTime != null) mFixedCurrentTime.setText(formatFixedTime(targetMs));
+            updateSeekPreview(seekBar, targetMs);
         }
 
         @Override
@@ -2315,6 +2347,9 @@ public class MobilePlaybackFragment extends PlaybackFragment {
             mWasPlayingBeforeDrag = isPlaying();
             if (mWasPlayingBeforeDrag) {
                 setPlayWhenReady(false);
+            }
+            if (mFixedSeekPreview != null && mStoryboardManager != null) {
+                mFixedSeekPreview.setVisibility(View.VISIBLE);
             }
         }
 
@@ -2329,6 +2364,41 @@ public class MobilePlaybackFragment extends PlaybackFragment {
             if (mWasPlayingBeforeDrag) {
                 setPlayWhenReady(true);
             }
+            if (mFixedSeekPreview != null) {
+                mFixedSeekPreview.setVisibility(View.GONE);
+            }
+        }
+
+        /** Loads the storyboard frame for targetMs and slides the preview thumbnail so it stays
+         *  centered above the drag thumb's current X position on seekBar. */
+        private void updateSeekPreview(android.widget.SeekBar seekBar, long targetMs) {
+            if (mFixedSeekPreview == null || mStoryboardManager == null) {
+                return;
+            }
+            mFixedSeekPreview.setVisibility(View.VISIBLE);
+            int requestId = ++mPreviewRequestId;
+            mStoryboardManager.getBitmapAt(targetMs, bitmap -> {
+                if (mFixedSeekPreview != null && requestId == mPreviewRequestId) {
+                    mFixedSeekPreview.setImageBitmap(bitmap);
+                }
+            });
+
+            int max = seekBar.getMax();
+            if (max <= 0 || mFixedSeekRow == null) {
+                return;
+            }
+            float fraction = seekBar.getProgress() / (float) max;
+            int usableWidth = seekBar.getWidth() - seekBar.getPaddingStart() - seekBar.getPaddingEnd();
+            float thumbCenterX = seekBar.getPaddingStart() + usableWidth * fraction;
+            // Both seekBar (via mFixedSeekRow) and mFixedSeekPreview are positioned relative to
+            // the same root ConstraintLayout, so translate the thumb's row-local X into that
+            // shared coordinate space before centering the preview under it.
+            float previewX = mFixedSeekRow.getX() + seekBar.getX() + thumbCenterX - mFixedSeekPreview.getWidth() / 2f;
+
+            View parent = (View) mFixedSeekRow.getParent();
+            float minX = 0f;
+            float maxX = parent != null ? parent.getWidth() - mFixedSeekPreview.getWidth() : previewX;
+            mFixedSeekPreview.setX(Math.max(minX, Math.min(previewX, maxX)));
         }
     }
 

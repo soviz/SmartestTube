@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
     Phone Search screen. The toolbar holds the query field; the area below shows either
-    query suggestions (while typing) or a 2-column grid of results (after a search).
+    query suggestions (while typing) or a full-width column of results (after a search).
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/search_root"
@@ -42,15 +42,15 @@
             android:inputType="text"
             android:importantForAutofill="no" />
 
-        <TextView
+        <ImageButton
             android:id="@+id/btn_voice"
             android:layout_width="56dp"
             android:layout_height="56dp"
-            android:gravity="center"
-            android:text="🎤"
+            android:padding="16dp"
+            android:src="@drawable/ic_mic"
+            android:tint="@color/mobile_text_primary"
+            android:scaleType="fitCenter"
             android:contentDescription="@string/mobile_search_voice"
-            android:textColor="@color/mobile_text_primary"
-            android:textSize="20sp"
             android:background="?android:attr/selectableItemBackground" />
 
         <TextView

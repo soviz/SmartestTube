@@ -129,6 +129,17 @@ public class StoryboardManager {
         loadPreview(mSeekPositions[index], callback);
     }
 
+    /** Like {@link #getBitmap(int, Callback)} but keyed by a raw playback position instead of a
+     *  precomputed seek index - used by callers (e.g. the mobile seek bar) that don't drive their
+     *  own {@link #getSeekPositions()}-based index grid. */
+    public void getBitmapAt(long positionMs, Callback callback) {
+        if (mStoryboard == null || positionMs < 0) {
+            return;
+        }
+
+        loadPreview(positionMs, callback);
+    }
+
     private void loadPreview(long currentPosition, Callback callback) {
         if (mStoryboard == null || mStoryboard.getGroupDurationMS() == 0) {
             return;
