@@ -70,6 +70,7 @@ fdroid/srclibs/
 # Local screenshot scratch (alpha2 device-verification captures)
 /alpha2_*.png
 build.log
+notes.txt
 out.txt
 out1.txt
 deps.txt

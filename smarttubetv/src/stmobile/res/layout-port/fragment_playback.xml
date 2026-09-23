@@ -115,25 +115,26 @@
     -->
 
     <!--
-        Overflow (gear) + video-speed buttons: fixed to the actual top-end corner of the video
-        strip via ConstraintLayout, same pattern as mobile_shorts_back_btn above - NOT inside
+        Overflow (gear) + HQ buttons: fixed to the actual top-end corner of the video strip via
+        ConstraintLayout, same pattern as mobile_shorts_back_btn above - NOT inside
         lb_playback_transport_controls_row.xml, whose own root view is only as tall as its
         content and gets vertically placed by Leanback's row-fragment machinery (so a
         top-aligned view inside it ends up mid-screen, not at the true top of the video). Compact
-        mode only - see VideoPlayerGlue#getCompactOverflowActions/#getSpeedAction.
+        mode only - see VideoPlayerGlue#getCompactOverflowActions/#getHighQualityAction.
         MobilePlaybackFragment resolves them via activity.findViewById() - id/class unchanged
-        from before, only their container moved.
+        from before, only their container moved. Video speed lives in the overflow menu itself
+        (see getCompactOverflowActions) rather than as a standalone button.
     -->
     <ImageButton
-        android:id="@+id/mobile_speed_btn"
+        android:id="@+id/mobile_hq_btn"
         android:layout_width="58dp"
         android:layout_height="58dp"
         android:padding="12dp"
-        android:src="@drawable/action_video_speed"
+        android:src="@drawable/lb_ic_hq"
         android:background="@android:color/transparent"
         android:scaleType="fitCenter"
         android:visibility="gone"
-        android:contentDescription="@string/action_video_speed"
+        android:contentDescription="@string/playback_settings"
         app:layout_constraintTop_toTopOf="@id/playback_controls_fragment"
         app:layout_constraintEnd_toStartOf="@id/mobile_overflow_btn"
         android:layout_marginTop="12dp" />
@@ -156,7 +157,7 @@
     <!--
         Fixed-position transport bar: seek bar + current/total time + play/pause/prev/next,
         pinned to the actual bottom of the video strip via ConstraintLayout (same pattern as the
-        overflow/speed buttons above), replacing the equivalent content that used to live inside
+        overflow/HQ buttons above), replacing the equivalent content that used to live inside
         lb_playback_transport_controls_row.xml. That row is rendered by Leanback's
         PlaybackSupportFragment/VerticalGridView machinery, which is tuned for the TV case (a
         controls row sitting above a shelf of related-video rows) and does not reliably pin a
@@ -168,7 +169,7 @@
         The old row's own seek bar/time/transport buttons are hidden (not removed - the row still
         carries the title/description block) once this bar takes over; see
         MobilePlaybackFragment#hideLegacyTransportRowParts. Compact mode only, same as the
-        overflow/speed buttons; Shorts keeps its own seek bar (setShortsChrome), so this bar stays
+        overflow/HQ buttons; Shorts keeps its own seek bar (setShortsChrome), so this bar stays
         gone there.
     -->
     <LinearLayout

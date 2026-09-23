@@ -1,0 +1,5 @@
+собрать прод:
+./gradlew :smarttubetv:assembleStmobileRelease
+
+закинуть на телефон, в папку downloads:
+adb push "/Users/vadym/Projects/SmartestTube/smarttubetv/build/outputs/apk/stmobile/release/SmarterTube-v0.5.0-beta.6-st32.51-arm64-v8a.apk" /sdcard/Download/

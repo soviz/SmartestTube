@@ -304,10 +304,10 @@ public class VideoPlayerGlue extends MaxControlsVideoPlayerGlue<PlayerAdapter> i
 
     /**
      * MOD (phone): the actions that used to sit in the compact secondary row (repeat, chat,
-     * subtitles, video-off, high quality), now surfaced through the overflow (gear) menu instead.
-     * Video speed gets its own dedicated button (see {@link #getSpeedAction()}) rather than being
-     * buried in the menu. Returns only the ones the user has enabled in Player Tweaks, in the
-     * same order the old row used.
+     * subtitles, video-off, video speed), now surfaced through the overflow (gear) menu instead.
+     * High quality gets its own dedicated button (see {@link #getHighQualityAction()}) rather
+     * than being buried in the menu. Returns only the ones the user has enabled in Player
+     * Tweaks, in the same order the old row used.
      */
     public java.util.List<Action> getCompactOverflowActions() {
         java.util.List<Action> actions = new java.util.ArrayList<>();
@@ -323,23 +323,23 @@ public class VideoPlayerGlue extends MaxControlsVideoPlayerGlue<PlayerAdapter> i
         if (mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_VIDEO_OFF)) {
             actions.add(mActions.get(R.id.action_video_off));
         }
-        if (mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_HIGH_QUALITY)) {
-            actions.add(mActions.get(R.id.lb_control_high_quality));
+        if (mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_VIDEO_SPEED)) {
+            actions.add(mActions.get(R.id.action_video_speed));
         }
         return actions;
     }
 
     /**
-     * MOD (phone): the video-speed action, shown as its own compact-mode button next to the
+     * MOD (phone): the high-quality action, shown as its own compact-mode button next to the
      * overflow gear instead of being buried in its menu. Null if the user disabled the button in
      * Player Tweaks.
      */
-    public Action getSpeedAction() {
-        return mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_VIDEO_SPEED)
-                ? mActions.get(R.id.action_video_speed) : null;
+    public Action getHighQualityAction() {
+        return mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_HIGH_QUALITY)
+                ? mActions.get(R.id.lb_control_high_quality) : null;
     }
 
-    /** Runs an action picked from the overflow (gear) menu, or the speed button, through the normal click path. */
+    /** Runs an action picked from the overflow (gear) menu, or the HQ button, through the normal click path. */
     public void performOverflowAction(Action action) {
         onActionClicked(action);
     }

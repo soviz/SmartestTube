@@ -124,7 +124,7 @@ public class MobilePlaybackFragment extends PlaybackFragment {
     private ImageButton mShortsBackBtn;
     private ImageButton mFullscreenBtn;
     private ImageButton mOverflowBtn;
-    private ImageButton mSpeedBtn;
+    private ImageButton mHqBtn;
     /** Open overflow (gear) popup, if any - dismissed when the controls overlay hides (see
      *  {@link #hideControlsOverlay}) so it never lingers over a faded/gone player. */
     private android.widget.PopupMenu mOverflowPopup;
@@ -132,7 +132,7 @@ public class MobilePlaybackFragment extends PlaybackFragment {
     // Fixed-position transport bar (seek bar + time + play/pause/prev/next) - replaces the
     // equivalent content of the Leanback transport row on phone, which doesn't reliably pin to
     // the true bottom of the video (see fragment_playback.xml's mobile_seek_row comment and
-    // FixedTransportController below). Compact mode only, same as mOverflowBtn/mSpeedBtn; never
+    // FixedTransportController below). Compact mode only, same as mOverflowBtn/mHqBtn; never
     // shown in Shorts (state 2), which drives its own seek bar via setShortsChrome.
     private View mFixedTransportButtons;
     private View mFixedTimeRow;
@@ -792,7 +792,7 @@ public class MobilePlaybackFragment extends PlaybackFragment {
             || viewContainsRaw(mFixedSeekRow, rawX, rawY)
             || viewContainsRaw(mFullscreenBtn, rawX, rawY)
             || viewContainsRaw(mOverflowBtn, rawX, rawY)
-            || viewContainsRaw(mSpeedBtn, rawX, rawY)
+            || viewContainsRaw(mHqBtn, rawX, rawY)
             || viewContainsRaw(mShortsBackBtn, rawX, rawY);
     }
 
@@ -1125,7 +1125,7 @@ public class MobilePlaybackFragment extends PlaybackFragment {
                 }
             }
         }
-        // mobile_overflow_btn/mobile_speed_btn live in fragment_playback.xml (fixed to the
+        // mobile_overflow_btn/mobile_hq_btn live in fragment_playback.xml (fixed to the
         // video strip's top-end corner via ConstraintLayout, not the lazily-inflated Leanback
         // row), so initPanelViews() already binds them on fragment creation. This is just a
         // defensive re-resolve in case that first lookup ran before mRoot was ready.
@@ -1138,23 +1138,23 @@ public class MobilePlaybackFragment extends PlaybackFragment {
                 }
             }
         }
-        if (mSpeedBtn == null) {
+        if (mHqBtn == null) {
             Activity activity = getActivity();
             if (activity != null) {
-                mSpeedBtn = activity.findViewById(R.id.mobile_speed_btn);
-                if (mSpeedBtn != null) {
-                    mSpeedBtn.setOnClickListener(this::onSpeedBtnClicked);
+                mHqBtn = activity.findViewById(R.id.mobile_hq_btn);
+                if (mHqBtn != null) {
+                    mHqBtn.setOnClickListener(this::onHqBtnClicked);
                 }
             }
         }
-        // Back button and fullscreen/overflow/speed toggles follow the player controls on all
+        // Back button and fullscreen/overflow/HQ toggles follow the player controls on all
         // non-Shorts pages.
         if (mShortsBackBtn != null && mLayoutState != 2) mShortsBackBtn.setVisibility(View.VISIBLE);
         if (mFullscreenBtn != null && mLayoutState != 2) mFullscreenBtn.setVisibility(View.VISIBLE);
         if (mOverflowBtn != null && mLayoutState != 2) mOverflowBtn.setVisibility(View.VISIBLE);
-        if (mSpeedBtn != null && mLayoutState != 2) {
+        if (mHqBtn != null && mLayoutState != 2) {
             VideoPlayerGlue glue = getPlayerGlue();
-            mSpeedBtn.setVisibility(glue != null && glue.getSpeedAction() != null ? View.VISIBLE : View.GONE);
+            mHqBtn.setVisibility(glue != null && glue.getHighQualityAction() != null ? View.VISIBLE : View.GONE);
         }
         // Fixed transport bar follows the same reveal, non-Shorts only - see
         // applyFixedTransportVisibility's javadoc. The legacy row's own seek bar/transport
@@ -1177,7 +1177,7 @@ public class MobilePlaybackFragment extends PlaybackFragment {
         if (mShortsBackBtn != null) mShortsBackBtn.setVisibility(View.INVISIBLE);
         if (mFullscreenBtn != null) mFullscreenBtn.setVisibility(View.INVISIBLE);
         if (mOverflowBtn != null) mOverflowBtn.setVisibility(View.INVISIBLE);
-        if (mSpeedBtn != null) mSpeedBtn.setVisibility(View.INVISIBLE);
+        if (mHqBtn != null) mHqBtn.setVisibility(View.INVISIBLE);
         applyFixedTransportVisibility(false);
         super.hideControlsOverlay(runAnimation);
     }
@@ -1753,9 +1753,9 @@ public class MobilePlaybackFragment extends PlaybackFragment {
 
     /**
      * Overflow (gear) button handler: lists the actions that used to crowd the compact secondary
-     * row (repeat, chat, subtitles, video-off, HQ - speed has its own dedicated button, see
-     * {@link #mOverflowBtn}'s sibling {@code mobile_speed_btn}) in a popup menu, each entry
-     * keeping the same icon it had as a standalone button.
+     * row (repeat, chat, subtitles, video-off, video speed - HQ has its own dedicated button, see
+     * {@link #mOverflowBtn}'s sibling {@code mobile_hq_btn}) in a popup menu, each entry keeping
+     * the same icon it had as a standalone button.
      */
     private void showOverflowMenu(View anchor) {
         VideoPlayerGlue glue = getPlayerGlue();
@@ -1779,7 +1779,18 @@ public class MobilePlaybackFragment extends PlaybackFragment {
         forceShowMenuIcons(popup);
         popup.setOnMenuItemClickListener(item -> {
             androidx.leanback.widget.Action action = actions.get(item.getItemId());
-            glue.performOverflowAction(action);
+            // Speed always opens the speed-picker dialog (the TV remote's long-click path), not
+            // the short-click's silent 1.0x/last-speed toggle - see
+            // VideoStateController#onSpeedClicked/onSpeedLongClicked in the common module. A menu
+            // tap has no separate long-press gesture, and a toggle with no visible feedback reads
+            // as "the button doesn't do anything," so it always goes through onActionLongClicked
+            // (VideoPlayerGlue#onActionLongClicked -> onButtonLongClicked -> onSpeedLongClicked)
+            // instead of performOverflowAction's short-click path.
+            if (action.getId() == R.id.action_video_speed) {
+                glue.onActionLongClicked(action);
+            } else {
+                glue.performOverflowAction(action);
+            }
             return true;
         });
         popup.setOnDismissListener(menu -> {
@@ -1808,22 +1819,17 @@ public class MobilePlaybackFragment extends PlaybackFragment {
     }
 
     /**
-     * Dedicated video-speed button: always opens the speed-picker dialog (the TV remote's
-     * long-click path), not the short-click's silent 1.0x/last-speed toggle - see
-     * VideoStateController#onSpeedClicked/onSpeedLongClicked in the common module. On a phone
-     * there's no separate long-press gesture for this dedicated button, and a toggle with no
-     * visible feedback reads as "the button doesn't do anything," so it always goes through
-     * onActionLongClicked (VideoPlayerGlue#onActionLongClicked -> onButtonLongClicked ->
-     * onSpeedLongClicked) instead of performOverflowAction's short-click path.
+     * Dedicated HQ button: runs the same action the overflow (gear) menu's HQ entry used to,
+     * through the normal short-click path (performOverflowAction -> onActionClicked).
      */
-    private void onSpeedBtnClicked(View v) {
+    private void onHqBtnClicked(View v) {
         VideoPlayerGlue glue = getPlayerGlue();
         if (glue == null) {
             return;
         }
-        androidx.leanback.widget.Action action = glue.getSpeedAction();
+        androidx.leanback.widget.Action action = glue.getHighQualityAction();
         if (action != null) {
-            glue.onActionLongClicked(action);
+            glue.performOverflowAction(action);
         }
     }
 
@@ -2061,7 +2067,7 @@ public class MobilePlaybackFragment extends PlaybackFragment {
         }
 
         // Overflow (gear) button: shows the compact-mode-only actions (repeat, chat, subtitles,
-        // video-off, HQ) in a popup menu instead of crowding the secondary row. See
+        // video-off, video speed) in a popup menu instead of crowding the secondary row. See
         // VideoPlayerGlue#getCompactOverflowActions. Fixed to the video strip's top-end corner
         // in fragment_playback.xml (not the Leanback controls row - see that layout's header
         // comment for why).
@@ -2070,10 +2076,10 @@ public class MobilePlaybackFragment extends PlaybackFragment {
             mOverflowBtn.setOnClickListener(this::showOverflowMenu);
         }
 
-        // Dedicated video-speed button, next to the overflow gear. See VideoPlayerGlue#getSpeedAction.
-        mSpeedBtn = activity.findViewById(R.id.mobile_speed_btn);
-        if (mSpeedBtn != null) {
-            mSpeedBtn.setOnClickListener(this::onSpeedBtnClicked);
+        // Dedicated HQ button, next to the overflow gear. See VideoPlayerGlue#getHighQualityAction.
+        mHqBtn = activity.findViewById(R.id.mobile_hq_btn);
+        if (mHqBtn != null) {
+            mHqBtn.setOnClickListener(this::onHqBtnClicked);
         }
 
         initFixedTransportViews(activity);
@@ -2152,7 +2158,7 @@ public class MobilePlaybackFragment extends PlaybackFragment {
      * mobile_transport_buttons/mobile_time_row/mobile_seek_row) and wires the transport buttons
      * and seek bar to the same action paths the old Leanback row used - VideoPlayerGlue's
      * togglePlayback/next/previous for the buttons (the identical dispatch
-     * showOverflowMenu/onSpeedBtnClicked already use) and PlaybackFragment's own
+     * showOverflowMenu/onHqBtnClicked already use) and PlaybackFragment's own
      * getPositionMs/setPositionMs/getDurationMs for the seek bar (the same ExoPlayerController
      * state the Leanback row's PlayerAdapter itself reads from - see FixedTransportController).
      */
