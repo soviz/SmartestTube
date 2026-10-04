@@ -66,6 +66,20 @@ public class MobilePlaybackActivity extends PlaybackActivity {
     @Override
     protected void onResume() {
         super.onResume();
+
+        // Stuck-background recovery (Samsung/One UI): resuming to the foreground with the engine
+        // still marked blocked and no real PIP window active means a previous background/PIP
+        // transition never got its closing callback (onPictureInPictureModeChanged / the dismiss
+        // path) - seen on Samsung devices after background audio or PIP, where the activity comes
+        // back resumed but blockEngine(true) was never undone. That stale block is what wedges
+        // navigation: PlaybackActivity.doNotDestroy()/wannaEnterToPip() keep treating this activity
+        // as "still backgrounding", so Back/swipe-to-minimize no-op instead of leaving the screen.
+        // Resuming is the reliable signal that we're genuinely back in the foreground (unlike the
+        // PIP-dismiss callback, which Samsung doesn't always deliver), so clear the stale block here.
+        if (mMobileFragment != null && !isInPipMode() && mMobileFragment.isEngineBlocked()) {
+            mMobileFragment.blockEngine(false);
+        }
+
         // Confirmed via logcat (InsetsController's from= stack traces): on a cold player start
         // the platform itself hides the status bar shortly after this - the OS's own
         // ViewRootImpl.controlInsetsForCompatibility runs during WindowManagerGlobal.addView,
