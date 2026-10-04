@@ -1968,8 +1968,10 @@ public class MobilePlaybackFragment extends PlaybackFragment {
         titleRow.setOnClickListener(v ->
                 setDescriptionExpanded(mDescriptionView.getVisibility() != View.VISIBLE));
         // Long descriptions scroll inside the text view instead of pushing the list away.
+        // No click-to-collapse here: it fought with ScrollingMovementMethod (any tap-like touch
+        // during a scroll gesture was read as a click and closed the panel mid-scroll). Collapsing
+        // is still reachable via titleRow/mExpandView above.
         mDescriptionView.setMovementMethod(new android.text.method.ScrollingMovementMethod());
-        mDescriptionView.setOnClickListener(v -> setDescriptionExpanded(false));
 
         mUpNextAdapter = new UpNextRowAdapter(
                 video -> PlaybackPresenter.instance(getContext()).onSuggestionItemClicked(video));
