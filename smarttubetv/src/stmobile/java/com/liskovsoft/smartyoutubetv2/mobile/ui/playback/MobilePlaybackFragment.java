@@ -125,6 +125,7 @@ public class MobilePlaybackFragment extends PlaybackFragment {
     private ImageButton mFullscreenBtn;
     private ImageButton mOverflowBtn;
     private ImageButton mHqBtn;
+    private ImageButton mVideoOffBtn;
     /** Open overflow (gear) popup, if any - dismissed when the controls overlay hides (see
      *  {@link #hideControlsOverlay}) so it never lingers over a faded/gone player. */
     private android.widget.PopupMenu mOverflowPopup;
@@ -173,8 +174,12 @@ public class MobilePlaybackFragment extends PlaybackFragment {
     // Centred play/pause indicator (Shorts only — visual only, not a button).
     private ImageView mShortsPlayPauseBtn;
 
-    // Bottom navigation bar and "You" profile sheet (Shorts only).
+    // Bottom navigation bar (Shorts and regular video strip) and "You" profile sheet (Shorts only).
     private View mShortsNavBar;
+    private ImageView mShortsNavMusicIcon;
+    private TextView mShortsNavMusicLabel;
+    // Boxed so the first call always applies regardless of isShorts's initial value.
+    private Boolean mNavBarMiddleTabIsMusic;
     private View mShortsProfileScrim;
     private LinearLayout mShortsProfileSheet;
 
@@ -793,6 +798,7 @@ public class MobilePlaybackFragment extends PlaybackFragment {
             || viewContainsRaw(mFullscreenBtn, rawX, rawY)
             || viewContainsRaw(mOverflowBtn, rawX, rawY)
             || viewContainsRaw(mHqBtn, rawX, rawY)
+            || viewContainsRaw(mVideoOffBtn, rawX, rawY)
             || viewContainsRaw(mShortsBackBtn, rawX, rawY);
     }
 
@@ -1044,6 +1050,7 @@ public class MobilePlaybackFragment extends PlaybackFragment {
         if (mShortsNavBar != null) {
             mShortsNavBar.setVisibility(strip ? View.VISIBLE : View.GONE);
         }
+        updateNavBarMiddleTab(isShorts);
 
         // Leanback suggestion rows: removed while in the strip (they draw inside the small video
         // area and stay clickable underneath it) and in landscape full-screen (should look like a
@@ -1064,7 +1071,7 @@ public class MobilePlaybackFragment extends PlaybackFragment {
             set.setDimensionRatio(R.id.playback_controls_fragment, ratio);
             set.setVisibility(R.id.mobile_below_video_panel, showPanel ? View.VISIBLE : View.GONE);
             set.setVisibility(R.id.mobile_shorts_info_bar, isShorts ? View.VISIBLE : View.GONE);
-            set.setVisibility(R.id.mobile_shorts_nav_bar, View.GONE);
+            set.setVisibility(R.id.mobile_shorts_nav_bar, View.VISIBLE);
         } else {
             set.connect(R.id.playback_controls_fragment, ConstraintSet.BOTTOM,
                     ConstraintSet.PARENT_ID, ConstraintSet.BOTTOM);
@@ -1147,14 +1154,27 @@ public class MobilePlaybackFragment extends PlaybackFragment {
                 }
             }
         }
-        // Back button and fullscreen/overflow/HQ toggles follow the player controls on all
-        // non-Shorts pages.
+        if (mVideoOffBtn == null) {
+            Activity activity = getActivity();
+            if (activity != null) {
+                mVideoOffBtn = activity.findViewById(R.id.mobile_video_off_btn);
+                if (mVideoOffBtn != null) {
+                    mVideoOffBtn.setOnClickListener(this::onVideoOffBtnClicked);
+                }
+            }
+        }
+        // Back button and fullscreen/overflow/HQ/video-off toggles follow the player controls on
+        // all non-Shorts pages.
         if (mShortsBackBtn != null && mLayoutState != 2) mShortsBackBtn.setVisibility(View.VISIBLE);
         if (mFullscreenBtn != null && mLayoutState != 2) mFullscreenBtn.setVisibility(View.VISIBLE);
         if (mOverflowBtn != null && mLayoutState != 2) mOverflowBtn.setVisibility(View.VISIBLE);
         if (mHqBtn != null && mLayoutState != 2) {
             VideoPlayerGlue glue = getPlayerGlue();
             mHqBtn.setVisibility(glue != null && glue.getHighQualityAction() != null ? View.VISIBLE : View.GONE);
+        }
+        if (mVideoOffBtn != null && mLayoutState != 2) {
+            VideoPlayerGlue glue = getPlayerGlue();
+            mVideoOffBtn.setVisibility(glue != null && glue.getVideoOffAction() != null ? View.VISIBLE : View.GONE);
         }
         // Fixed transport bar follows the same reveal, non-Shorts only - see
         // applyFixedTransportVisibility's javadoc. The legacy row's own seek bar/transport
@@ -1178,6 +1198,7 @@ public class MobilePlaybackFragment extends PlaybackFragment {
         if (mFullscreenBtn != null) mFullscreenBtn.setVisibility(View.INVISIBLE);
         if (mOverflowBtn != null) mOverflowBtn.setVisibility(View.INVISIBLE);
         if (mHqBtn != null) mHqBtn.setVisibility(View.INVISIBLE);
+        if (mVideoOffBtn != null) mVideoOffBtn.setVisibility(View.INVISIBLE);
         applyFixedTransportVisibility(false);
         super.hideControlsOverlay(runAnimation);
     }
@@ -1266,10 +1287,27 @@ public class MobilePlaybackFragment extends PlaybackFragment {
                 }).start();
     }
 
-    /** Navigate to a browse section and close the Shorts player. */
+    /** Navigate to a browse section and close the player. */
     private void navigateToSection(int sectionType) {
         BrowsePresenter.instance(getContext()).selectSection(sectionType);
         requireActivity().onBackPressed();
+    }
+
+    /** Bottom nav bar's middle tab: Music for Shorts, Subscriptions for a regular video. */
+    private void updateNavBarMiddleTab(boolean isShorts) {
+        if (mShortsNavMusicIcon == null) {
+            return;
+        }
+        if (mNavBarMiddleTabIsMusic != null && mNavBarMiddleTabIsMusic == isShorts) {
+            return;
+        }
+        mNavBarMiddleTabIsMusic = isShorts;
+        if (mShortsNavMusicIcon != null) {
+            mShortsNavMusicIcon.setImageResource(isShorts ? R.drawable.icon_music : R.drawable.icon_subscriptions);
+        }
+        if (mShortsNavMusicLabel != null) {
+            mShortsNavMusicLabel.setText(isShorts ? R.string.header_music : R.string.header_subscriptions);
+        }
     }
 
     /** Slide the "You" profile sheet up from the bottom. */
@@ -1753,8 +1791,9 @@ public class MobilePlaybackFragment extends PlaybackFragment {
 
     /**
      * Overflow (gear) button handler: lists the actions that used to crowd the compact secondary
-     * row (repeat, chat, subtitles, video-off, video speed - HQ has its own dedicated button, see
-     * {@link #mOverflowBtn}'s sibling {@code mobile_hq_btn}) in a popup menu, each entry keeping
+     * row (repeat, chat, subtitles, video speed - HQ and video-off have their own dedicated
+     * buttons, see {@link #mOverflowBtn}'s siblings {@code mobile_hq_btn}/{@code mobile_video_off_btn})
+     * in a popup menu, each entry keeping
      * the same icon it had as a standalone button.
      */
     private void showOverflowMenu(View anchor) {
@@ -1828,6 +1867,21 @@ public class MobilePlaybackFragment extends PlaybackFragment {
             return;
         }
         androidx.leanback.widget.Action action = glue.getHighQualityAction();
+        if (action != null) {
+            glue.performOverflowAction(action);
+        }
+    }
+
+    /**
+     * Dedicated video-off button: runs the same action the overflow (gear) menu's "Video off"
+     * entry used to, through the normal short-click path (performOverflowAction -> onActionClicked).
+     */
+    private void onVideoOffBtnClicked(View v) {
+        VideoPlayerGlue glue = getPlayerGlue();
+        if (glue == null) {
+            return;
+        }
+        androidx.leanback.widget.Action action = glue.getVideoOffAction();
         if (action != null) {
             glue.performOverflowAction(action);
         }
@@ -2069,7 +2123,7 @@ public class MobilePlaybackFragment extends PlaybackFragment {
         }
 
         // Overflow (gear) button: shows the compact-mode-only actions (repeat, chat, subtitles,
-        // video-off, video speed) in a popup menu instead of crowding the secondary row. See
+        // video speed) in a popup menu instead of crowding the secondary row. See
         // VideoPlayerGlue#getCompactOverflowActions. Fixed to the video strip's top-end corner
         // in fragment_playback.xml (not the Leanback controls row - see that layout's header
         // comment for why).
@@ -2084,22 +2138,33 @@ public class MobilePlaybackFragment extends PlaybackFragment {
             mHqBtn.setOnClickListener(this::onHqBtnClicked);
         }
 
+        // Dedicated video-off button, next to HQ. See VideoPlayerGlue#getVideoOffAction.
+        mVideoOffBtn = activity.findViewById(R.id.mobile_video_off_btn);
+        if (mVideoOffBtn != null) {
+            mVideoOffBtn.setOnClickListener(this::onVideoOffBtnClicked);
+        }
+
         initFixedTransportViews(activity);
 
         // Centred play/pause indicator (ImageView — visual only, not tappable directly).
         mShortsPlayPauseBtn = activity.findViewById(R.id.mobile_shorts_play_pause_btn);
 
-        // Bottom navigation bar.
+        // Bottom navigation bar: Home / History always; the middle tab is Music for Shorts,
+        // Subscriptions for a regular video (same bar reused for both - see
+        // applyMobileLayout()/updateMiddleNavTab()).
         mShortsNavBar = activity.findViewById(R.id.mobile_shorts_nav_bar);
         if (mShortsNavBar != null) {
             // Ensure nav bar draws on top of the profile sheet during slide-up animation.
             mShortsNavBar.bringToFront();
             mShortsNavBar.findViewById(R.id.shorts_nav_home).setOnClickListener(v ->
                     navigateToSection(MediaGroup.TYPE_HOME));
-            mShortsNavBar.findViewById(R.id.shorts_nav_music).setOnClickListener(v ->
-                    navigateToSection(MediaGroup.TYPE_MUSIC));
             mShortsNavBar.findViewById(R.id.shorts_nav_history).setOnClickListener(v ->
                     navigateToSection(MediaGroup.TYPE_HISTORY));
+            mShortsNavBar.findViewById(R.id.shorts_nav_music).setOnClickListener(v ->
+                    navigateToSection(Boolean.TRUE.equals(mNavBarMiddleTabIsMusic)
+                            ? MediaGroup.TYPE_MUSIC : MediaGroup.TYPE_SUBSCRIPTIONS));
+            mShortsNavMusicIcon = mShortsNavBar.findViewById(R.id.shorts_nav_music_icon);
+            mShortsNavMusicLabel = mShortsNavBar.findViewById(R.id.shorts_nav_music_label);
         }
 
         // "You" profile sheet and scrim.

@@ -88,6 +88,7 @@
     <string name="player_ui_hide_behavior">Auto-hide UI</string>
     <string name="option_never">Never</string>
     <string name="side_panel_sections">Set-up sections</string>
+    <string name="home_shelves">Home shelves</string>
     <string name="boot_to_section">Boot to section</string>
     <string name="large_ui">Large UI</string>
     <string name="video_grid_scale">Video grid scale</string>

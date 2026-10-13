@@ -88,6 +88,7 @@
     <string name="player_ui_hide_behavior">Скрывать интерфейс</string>
     <string name="option_never">Никогда</string>
     <string name="side_panel_sections">Настроить разделы</string>
+    <string name="home_shelves">Полки на главной</string>
     <string name="boot_to_section">Загружаться в раздел</string>
     <string name="large_ui">Увеличенный интерфейс</string>
     <string name="video_grid_scale">Масштаб сетки роликов</string>

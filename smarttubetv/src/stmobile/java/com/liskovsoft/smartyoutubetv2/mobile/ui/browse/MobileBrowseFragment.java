@@ -48,6 +48,7 @@ import com.liskovsoft.smartyoutubetv2.common.app.presenters.settings.AccountSett
 import com.liskovsoft.smartyoutubetv2.common.app.views.BrowseView;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.FormatItem;
 import com.liskovsoft.smartyoutubetv2.common.misc.MediaServiceManager;
+import com.liskovsoft.smartyoutubetv2.common.prefs.MainUIData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerData;
 import com.liskovsoft.smartyoutubetv2.mobile.notifications.NotificationPollWorker;
 import com.liskovsoft.smartyoutubetv2.mobile.ui.about.MobileAboutActivity;
@@ -203,7 +204,13 @@ public class MobileBrowseFragment extends Fragment implements BrowseView, MediaS
                 return;
             }
             mSwipeRefreshing = true;
-            mPresenter.refresh(false);
+            if (mCurrentSectionId == MediaGroup.TYPE_HOME) {
+                // Re-fetching Home from scratch tends to return the same feed; continue
+                // the shown shelves instead so pull-to-refresh actually brings new videos.
+                mPresenter.refreshByContinuation();
+            } else {
+                mPresenter.refresh(false);
+            }
         });
 
         mPresenter = BrowsePresenter.instance(getContext());
@@ -396,12 +403,14 @@ public class MobileBrowseFragment extends Fragment implements BrowseView, MediaS
                 } else if (mShelfAdapter != null) {
                     mShelfAdapter.appendGroup(group);
                 } else if (mGridAdapter != null) {
-                    // Home mixes multiple topic groups (Recommendations, Trending, etc.) into
-                    // one API response; keep only the first (Recommendations) instead of
-                    // dumping every topic into the same feed.
-                    if (mCurrentSectionId == MediaGroup.TYPE_HOME && !mGridGroupSizes.isEmpty()
-                            && !mGridGroupSizes.containsKey(group)) {
-                        break;
+                    // Home mixes multiple topic shelves (Recommendations, Trending, etc.) into
+                    // one API response; only the ones enabled in Settings > Home shelves get
+                    // mixed into the single-column feed (see MainUIData#isHomeShelfEnabled).
+                    if (mCurrentSectionId == MediaGroup.TYPE_HOME) {
+                        MainUIData.instance(getContext()).noteHomeShelfSeen(group.getTitle());
+                        if (!MainUIData.instance(getContext()).isHomeShelfEnabled(group.getTitle())) {
+                            break;
+                        }
                     }
                     appendGridGroup(group);
                 }

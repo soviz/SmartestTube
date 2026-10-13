@@ -76,6 +76,7 @@ public class GeneralSettingsPresenter extends BasePresenter<Void> {
 
         appendBootToSection(settingsPresenter);
         appendEnabledSections(settingsPresenter);
+        appendHomeShelvesCategory(settingsPresenter);
         appendContextMenuItemsCategory(settingsPresenter);
         appendHideContent(settingsPresenter);
         appendAppExitCategory(settingsPresenter);
@@ -108,6 +109,28 @@ public class GeneralSettingsPresenter extends BasePresenter<Void> {
         }
 
         settingsPresenter.appendCheckedCategory(getContext().getString(R.string.side_panel_sections), options);
+    }
+
+    /**
+     * Shelf titles come from YouTube at runtime (not a fixed enum), so the list only shows
+     * titles already seen on Home in this session. Empty until Home has loaded at least once.
+     */
+    private void appendHomeShelvesCategory(AppDialogPresenter settingsPresenter) {
+        List<String> seenShelves = mMainUIData.getSeenHomeShelves();
+
+        if (seenShelves.isEmpty()) {
+            return;
+        }
+
+        List<OptionItem> options = new ArrayList<>();
+
+        for (String shelfTitle : seenShelves) {
+            options.add(UiOptionItem.from(shelfTitle,
+                    optionItem -> mMainUIData.setHomeShelfEnabled(shelfTitle, optionItem.isSelected()),
+                    mMainUIData.isHomeShelfEnabled(shelfTitle)));
+        }
+
+        settingsPresenter.appendCheckedCategory(getContext().getString(R.string.home_shelves), options);
     }
 
     private void appendHideContent(AppDialogPresenter settingsPresenter) {

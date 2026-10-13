@@ -71,6 +71,7 @@ public class BrowsePresenter extends BasePresenter<BrowseView> implements Sectio
     private final BrowseProcessorManager mBrowseProcessor;
     private final List<Disposable> mActions;
     private final Runnable mRefreshSection = this::refresh;
+    private final List<VideoGroup> mCurrentRowGroups = new ArrayList<>();
     private BrowseSection mCurrentSection;
     private Video mCurrentVideo;
     private long mLastUpdateTimeMs = -1;
@@ -611,6 +612,88 @@ public class BrowsePresenter extends BasePresenter<BrowseView> implements Sectio
         }
     }
 
+    /**
+     * Pull-to-refresh on Home: re-fetching the same browseId tends to return the same feed
+     * (see BrowsePresenter/YouTube Home caching), so instead continue each currently shown
+     * row with its next-page token to bring in fresh videos. Unlike scroll-triggered
+     * continuation (which appends to the bottom), the new videos replace what's on screen so
+     * the user actually sees them without scrolling. Falls back to a normal refresh when
+     * there's nothing to continue (e.g. first load, or a non-Home section).
+     */
+    public void refreshByContinuation() {
+        if (getView() == null || mCurrentSection == null || mCurrentRowGroups.isEmpty()) {
+            refresh(false);
+            return;
+        }
+
+        List<VideoGroup> continuableGroups = new ArrayList<>();
+        for (VideoGroup group : mCurrentRowGroups) {
+            if (group.getMediaGroup() != null && !TextUtils.isEmpty(group.getNextPageKey())) {
+                continuableGroups.add(group);
+            }
+        }
+
+        if (continuableGroups.isEmpty()) {
+            refresh(false);
+            return;
+        }
+
+        disposeActions();
+
+        getView().showProgressBar(true);
+
+        List<Video> allNewVideos = Collections.synchronizedList(new ArrayList<>());
+        int[] pendingCount = {continuableGroups.size()};
+
+        for (VideoGroup group : continuableGroups) {
+            continueGroupCollecting(group, allNewVideos, pendingCount);
+        }
+    }
+
+    /**
+     * Fetches the next page for a single Home row and collects its new videos into the shared
+     * list. Once every row in the batch has responded, replaces the on-screen feed in one go
+     * (see refreshByContinuation()).
+     */
+    private void continueGroupCollecting(VideoGroup group, List<Video> allNewVideos, int[] pendingCount) {
+        int previousSize = group.getSize();
+        MediaGroup mediaGroup = group.getMediaGroup();
+
+        Disposable continueAction = getContentService().continueGroupObserve(mediaGroup)
+                .subscribe(
+                        continueGroup -> {
+                            VideoGroup fullGroup = VideoGroup.from(group, continueGroup);
+                            allNewVideos.addAll(fullGroup.getVideos().subList(
+                                    Math.min(previousSize, fullGroup.getSize()), fullGroup.getSize()));
+                            mBrowseProcessor.process(fullGroup);
+                        },
+                        error -> {
+                            Log.e(TAG, "continueGroupCollecting error: %s", error.getMessage());
+                            onGroupBatchItemDone(allNewVideos, pendingCount);
+                        },
+                        () -> onGroupBatchItemDone(allNewVideos, pendingCount)
+                );
+
+        mActions.add(continueAction);
+    }
+
+    private void onGroupBatchItemDone(List<Video> allNewVideos, int[] pendingCount) {
+        pendingCount[0]--;
+
+        if (pendingCount[0] > 0 || getView() == null) {
+            return;
+        }
+
+        getView().showProgressBar(false);
+
+        VideoGroup clearGroup = VideoGroup.from(getCurrentSection());
+        clearGroup.setAction(VideoGroup.ACTION_REPLACE);
+        getView().updateSection(clearGroup);
+
+        VideoGroup freshGroup = VideoGroup.from(allNewVideos, getCurrentSection());
+        getView().updateSection(freshGroup);
+    }
+
     private void updateRefreshTime() {
         mLastUpdateTimeMs = System.currentTimeMillis();
     }
@@ -705,6 +788,8 @@ public class BrowsePresenter extends BasePresenter<BrowseView> implements Sectio
         firstGroup.setAction(VideoGroup.ACTION_REPLACE);
         getView().updateSection(firstGroup);
 
+        mCurrentRowGroups.clear();
+
         if (groups == null) {
             // No group. Maybe just clear.
             getView().showProgressBar(false);
@@ -729,6 +814,8 @@ public class BrowsePresenter extends BasePresenter<BrowseView> implements Sectio
                                 if (TextUtils.isEmpty(videoGroup.getTitle())) {
                                     videoGroup.setTitle(getContext().getString(R.string.suggestions));
                                 }
+
+                                mCurrentRowGroups.add(videoGroup);
 
                                 getView().updateSection(videoGroup);
                                 mBrowseProcessor.process(videoGroup);

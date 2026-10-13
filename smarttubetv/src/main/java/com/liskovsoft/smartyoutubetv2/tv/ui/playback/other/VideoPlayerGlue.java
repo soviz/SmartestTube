@@ -304,10 +304,11 @@ public class VideoPlayerGlue extends MaxControlsVideoPlayerGlue<PlayerAdapter> i
 
     /**
      * MOD (phone): the actions that used to sit in the compact secondary row (repeat, chat,
-     * subtitles, video-off, video speed), now surfaced through the overflow (gear) menu instead.
-     * High quality gets its own dedicated button (see {@link #getHighQualityAction()}) rather
-     * than being buried in the menu. Returns only the ones the user has enabled in Player
-     * Tweaks, in the same order the old row used.
+     * subtitles, video speed), now surfaced through the overflow (gear) menu instead.
+     * High quality and video-off get their own dedicated buttons (see
+     * {@link #getHighQualityAction()}/{@link #getVideoOffAction()}) rather than being buried in
+     * the menu. Returns only the ones the user has enabled in Player Tweaks, in the same order
+     * the old row used.
      */
     public java.util.List<Action> getCompactOverflowActions() {
         java.util.List<Action> actions = new java.util.ArrayList<>();
@@ -319,9 +320,6 @@ public class VideoPlayerGlue extends MaxControlsVideoPlayerGlue<PlayerAdapter> i
         }
         if (mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_SUBTITLES)) {
             actions.add(mActions.get(R.id.lb_control_closed_captioning));
-        }
-        if (mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_VIDEO_OFF)) {
-            actions.add(mActions.get(R.id.action_video_off));
         }
         if (mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_VIDEO_SPEED)) {
             actions.add(mActions.get(R.id.action_video_speed));
@@ -337,6 +335,16 @@ public class VideoPlayerGlue extends MaxControlsVideoPlayerGlue<PlayerAdapter> i
     public Action getHighQualityAction() {
         return mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_HIGH_QUALITY)
                 ? mActions.get(R.id.lb_control_high_quality) : null;
+    }
+
+    /**
+     * MOD (phone): the video-off action, shown as its own compact-mode button next to HQ instead
+     * of being buried in the overflow menu. Null if the user disabled the button in Player
+     * Tweaks.
+     */
+    public Action getVideoOffAction() {
+        return mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_VIDEO_OFF)
+                ? mActions.get(R.id.action_video_off) : null;
     }
 
     /** Runs an action picked from the overflow (gear) menu, or the HQ button, through the normal click path. */
