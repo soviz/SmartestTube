@@ -85,7 +85,7 @@ surface via the bundled media-service layer.
   `doubletapplayerview`, `slidableactivity`.
 * **Product flavors:** `stbeta`, `ststable`, `stfdroid` (upstream TV,
   F-Droid build with no proprietary/Google-Play-only deps), `stmobile`
-  (this fork's native phone/tablet UI, `app.smarttube` application ID).
+  (this fork's native phone/tablet UI, `com.codesculptor.smartertube` application ID; debug builds add a `.debug` suffix).
 * **Min/target SDK, NDK, etc.:** defined via `project.properties.*` in
   `gradle.properties` / `SharedModules/constants.gradle` — check there
   rather than assuming a fixed value.

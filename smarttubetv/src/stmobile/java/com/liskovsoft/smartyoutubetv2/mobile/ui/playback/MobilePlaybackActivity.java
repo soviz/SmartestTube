@@ -4,6 +4,9 @@ import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.content.res.Configuration;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.SystemClock;
 import android.view.MotionEvent;
 
 import androidx.core.view.WindowCompat;
@@ -32,7 +35,13 @@ import com.liskovsoft.smartyoutubetv2.tv.ui.playback.PlaybackActivity;
  * the first video's orientation until the activity is recreated.
  */
 public class MobilePlaybackActivity extends PlaybackActivity {
+    private static final long IDLE_RELEASE_MS = 30 * 60 * 1_000L;
+    private static final long IDLE_CHECK_INTERVAL_MS = 60 * 1_000L;
     private MobilePlaybackFragment mMobileFragment;
+    private final Handler mIdleHandler = new Handler(Looper.getMainLooper());
+    private final Runnable mIdleCheck = this::checkBackgroundIdle;
+    /** elapsedRealtime() since playback has been paused/stopped while in background, 0 = playing. */
+    private long mIdleSinceMs;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -55,6 +64,55 @@ public class MobilePlaybackActivity extends PlaybackActivity {
         }
 
         applyOrientationForCurrentVideo();
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        mIdleHandler.removeCallbacks(mIdleCheck);
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        mIdleHandler.removeCallbacks(mIdleCheck);
+        if (!isFinishing()) {
+            mIdleSinceMs = 0;
+            mIdleHandler.postDelayed(mIdleCheck, IDLE_CHECK_INTERVAL_MS);
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        mIdleHandler.removeCallbacks(mIdleCheck);
+        super.onDestroy();
+    }
+
+    /**
+     * Background idle release: a player left paused in the background (e.g. paused from the
+     * lockscreen with background audio on) keeps the engine blocked and the media foreground
+     * service running, which pins the whole process in memory indefinitely. Once nothing has
+     * played for {@link #IDLE_RELEASE_MS}, close the player the same way as dismissing PIP
+     * (unblock + finishReally): the engine is released, RemoteControlService is stopped by
+     * MobilePlaybackFragment.onMediaSessionCreated(null), and Android may reclaim the process.
+     * finishReally() doesn't bring anything to the foreground on the phone (see
+     * shouldStartParentViewOnFinish()).
+     */
+    private void checkBackgroundIdle() {
+        if (isFinishing() || isDestroyed()) {
+            return;
+        }
+
+        if (PlaybackPresenter.instance(this).isPlaying()) {
+            mIdleSinceMs = 0;
+        } else if (mIdleSinceMs == 0) {
+            mIdleSinceMs = SystemClock.elapsedRealtime();
+        } else if (SystemClock.elapsedRealtime() - mIdleSinceMs >= IDLE_RELEASE_MS) {
+            exitPip();
+            return;
+        }
+
+        mIdleHandler.postDelayed(mIdleCheck, IDLE_CHECK_INTERVAL_MS);
     }
 
     @Override

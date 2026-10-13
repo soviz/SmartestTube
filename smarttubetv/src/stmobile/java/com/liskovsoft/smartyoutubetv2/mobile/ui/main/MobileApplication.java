@@ -1,6 +1,12 @@
 package com.liskovsoft.smartyoutubetv2.mobile.ui.main;
 
+import android.app.Activity;
+import android.content.ComponentName;
+import android.content.Intent;
 import android.content.SharedPreferences;
+import android.os.Bundle;
+
+import androidx.annotation.Nullable;
 
 import com.liskovsoft.sharedutils.prefs.GlobalPreferences;
 import com.liskovsoft.sharedutils.rx.RxHelper;
@@ -49,6 +55,10 @@ import com.liskovsoft.smartyoutubetv2.tv.ui.webbrowser.WebBrowserActivity;
  */
 public class MobileApplication extends MainApplication {
     private static final long STALE_SERVICE_CHECK_DELAY_MS = 5_000;
+    private static final int HOST_LAUNCH_INCOMPATIBLE_FLAGS = Intent.FLAG_ACTIVITY_CLEAR_TASK
+            | Intent.FLAG_ACTIVITY_MULTIPLE_TASK | Intent.FLAG_ACTIVITY_NEW_DOCUMENT;
+    @Nullable
+    private AppLifecycleGuard mLifecycleGuard;
 
     @Override
     public void onCreate() {
@@ -59,7 +69,8 @@ public class MobileApplication extends MainApplication {
         super.onCreate();
 
         initEarly();
-        registerActivityLifecycleCallbacks(new AppLifecycleGuard(this));
+        mLifecycleGuard = new AppLifecycleGuard(this);
+        registerActivityLifecycleCallbacks(mLifecycleGuard);
         Utils.postDelayed(this::stopOrphanedRemoteControlService, STALE_SERVICE_CHECK_DELAY_MS);
 
         // Notifications section/feature removed from the app. Force the push toggle off
@@ -69,6 +80,52 @@ public class MobileApplication extends MainApplication {
 
         hideScreenDimmingButtonOnce();
         defaultBackgroundPlaybackOnce();
+    }
+
+    @Override
+    public void startActivity(Intent intent) {
+        startActivity(intent, null);
+    }
+
+    /**
+     * PIP fix: screens opened while the player is in PIP landed inside the PIP window.
+     *
+     * ViewManager starts every screen from the application context with FLAG_ACTIVITY_NEW_TASK,
+     * so Android places it by task affinity. Entering PIP moves the player into its own pinned
+     * task, and that task used to share the app's affinity - being the top-most one, it won the
+     * lookup and e.g. Search opened in the small window.
+     *
+     * Two parts (manifest + here), both needed:
+     * - MobilePlaybackActivity has its own taskAffinity, so the pinned task created for it no
+     *   longer matches the affinity of the other screens (incl. singleTask Search/Home).
+     * - Our own screens are launched from a live activity of the current task without NEW_TASK,
+     *   so the player (despite its own affinity) still opens inside the main task, and dialogs
+     *   opened from the player still stack on top of it - navigation stays exactly as before.
+     * Falls back to the plain application-context launch when no activity is alive.
+     */
+    @Override
+    public void startActivity(Intent intent, @Nullable Bundle options) {
+        Activity host = canLaunchFromHost(intent) && mLifecycleGuard != null
+                ? mLifecycleGuard.findLaunchHost() : null;
+
+        if (host != null) {
+            Intent hostIntent = new Intent(intent);
+            hostIntent.removeFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            host.startActivity(hostIntent, options);
+            return;
+        }
+
+        super.startActivity(intent, options);
+    }
+
+    private boolean canLaunchFromHost(@Nullable Intent intent) {
+        if (intent == null) {
+            return false;
+        }
+        ComponentName component = intent.getComponent();
+        return component != null
+                && getPackageName().equals(component.getPackageName())
+                && (intent.getFlags() & HOST_LAUNCH_INCOMPATIBLE_FLAGS) == 0;
     }
 
     /**

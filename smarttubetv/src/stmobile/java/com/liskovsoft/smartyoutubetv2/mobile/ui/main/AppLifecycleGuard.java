@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.app.Application;
 import android.content.Context;
 import android.content.Intent;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.SystemClock;
 
@@ -15,6 +16,10 @@ import com.liskovsoft.smartyoutubetv2.common.app.presenters.PlaybackPresenter;
 import com.liskovsoft.smartyoutubetv2.common.misc.MotherActivity;
 import com.liskovsoft.smartyoutubetv2.mobile.ui.browse.MobileBrowseActivity;
 import com.liskovsoft.smartyoutubetv2.tv.ui.main.SplashActivity;
+
+import java.lang.ref.WeakReference;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Keeps the phone app from running in a half-initialized or stale state after a long idle.
@@ -30,6 +35,10 @@ import com.liskovsoft.smartyoutubetv2.tv.ui.main.SplashActivity;
  *    in the background and nothing is playing, the whole task is replaced with a fresh Home screen
  *    (fresh feed, no stale player/fragments). The process itself is not killed: a self-kill would
  *    leave the task in Recents and lead straight back into case 1.
+ *
+ * 3) Launch host. Keeps the activities in resume order so {@link MobileApplication#startActivity}
+ *    can launch screens from a live activity of the main task instead of the application context
+ *    (see {@link #findLaunchHost()}).
  */
 final class AppLifecycleGuard implements Application.ActivityLifecycleCallbacks {
     private static final String TAG = AppLifecycleGuard.class.getSimpleName();
@@ -42,6 +51,8 @@ final class AppLifecycleGuard implements Application.ActivityLifecycleCallbacks 
     private int mStartedCount;
     /** elapsedRealtime() when the last visible activity stopped, 0 while in foreground. */
     private long mBackgroundSinceMs;
+    /** Live activities, the most recently resumed last. */
+    private final List<WeakReference<Activity>> mResumeOrder = new ArrayList<>();
 
     AppLifecycleGuard(@NonNull Context context) {
         mAppContext = context.getApplicationContext();
@@ -111,7 +122,8 @@ final class AppLifecycleGuard implements Application.ActivityLifecycleCallbacks 
 
     @Override
     public void onActivityResumed(@NonNull Activity activity) {
-        // NOP
+        remove(activity);
+        mResumeOrder.add(new WeakReference<>(activity));
     }
 
     @Override
@@ -126,6 +138,41 @@ final class AppLifecycleGuard implements Application.ActivityLifecycleCallbacks 
 
     @Override
     public void onActivityDestroyed(@NonNull Activity activity) {
-        // NOP
+        remove(activity);
+    }
+
+    /**
+     * The most recently resumed activity that can host a launch, or null to fall back to the
+     * application context. Skipped: Splash (singleInstance - anything it starts gets its own
+     * task) and an activity currently in PIP (anything it starts would open in the PIP window).
+     * Evaluated at launch time, so a player expanded back from PIP is a valid host again.
+     */
+    @Nullable
+    Activity findLaunchHost() {
+        for (int i = mResumeOrder.size() - 1; i >= 0; i--) {
+            Activity activity = mResumeOrder.get(i).get();
+
+            if (activity == null || activity.isFinishing() || activity.isDestroyed()
+                    || activity instanceof SplashActivity) {
+                continue;
+            }
+
+            if (Build.VERSION.SDK_INT >= 24 && activity.isInPictureInPictureMode()) {
+                continue;
+            }
+
+            return activity;
+        }
+
+        return null;
+    }
+
+    private void remove(@NonNull Activity activity) {
+        for (int i = mResumeOrder.size() - 1; i >= 0; i--) {
+            Activity item = mResumeOrder.get(i).get();
+            if (item == null || item == activity) {
+                mResumeOrder.remove(i);
+            }
+        }
     }
 }

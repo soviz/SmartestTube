@@ -81,9 +81,13 @@
         <!-- Phone playback host. Extends the TV PlaybackActivity; screen orientation is
              chosen at runtime by video type — portrait for Shorts, landscape otherwise.
              screenOrientation="behind" makes it open in the caller's orientation (Home is
-             portrait) so a Short never flashes landscape before the runtime lock applies. -->
+             portrait) so a Short never flashes landscape before the runtime lock applies.
+             taskAffinity: own affinity so the pinned task Android creates for PIP doesn't match
+             the other screens' affinity (otherwise e.g. Search opens inside the PIP window).
+             The player still opens inside the main task - see MobileApplication.startActivity. -->
         <activity
             android:name="com.liskovsoft.smartyoutubetv2.mobile.ui.playback.MobilePlaybackActivity"
+            android:taskAffinity="${applicationId}.player"
             android:exported="false"
             android:launchMode="singleTop"
             android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|layoutDirection|keyboardHidden"
