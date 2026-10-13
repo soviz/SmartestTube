@@ -2,6 +2,13 @@ package com.liskovsoft.smartyoutubetv2.mobile.ui.main;
 
 import android.content.SharedPreferences;
 
+import com.liskovsoft.sharedutils.prefs.GlobalPreferences;
+import com.liskovsoft.sharedutils.rx.RxHelper;
+import com.liskovsoft.smartyoutubetv2.common.app.presenters.PlaybackPresenter;
+import com.liskovsoft.smartyoutubetv2.common.misc.RemoteControlService;
+import com.liskovsoft.smartyoutubetv2.common.prefs.RemoteControlData;
+import com.liskovsoft.smartyoutubetv2.common.utils.Utils;
+
 import com.liskovsoft.smartyoutubetv2.common.app.views.AddDeviceView;
 import com.liskovsoft.smartyoutubetv2.common.app.views.AppDialogView;
 import com.liskovsoft.smartyoutubetv2.common.app.views.BrowseView;
@@ -41,6 +48,8 @@ import com.liskovsoft.smartyoutubetv2.tv.ui.webbrowser.WebBrowserActivity;
  * phases will replace them in turn).
  */
 public class MobileApplication extends MainApplication {
+    private static final long STALE_SERVICE_CHECK_DELAY_MS = 5_000;
+
     @Override
     public void onCreate() {
         // Apply the persisted Theme choice (System / Light / Dark) before any activity
@@ -49,6 +58,10 @@ public class MobileApplication extends MainApplication {
         MobileThemePrefs.apply(this);
         super.onCreate();
 
+        initEarly();
+        registerActivityLifecycleCallbacks(new AppLifecycleGuard(this));
+        Utils.postDelayed(this::stopOrphanedRemoteControlService, STALE_SERVICE_CHECK_DELAY_MS);
+
         // Notifications section/feature removed from the app. Force the push toggle off
         // regardless of the previously saved user choice, and make sure no poll is scheduled.
         MobileNotificationPrefs.setEnabled(this, false);
@@ -56,6 +69,32 @@ public class MobileApplication extends MainApplication {
 
         hideScreenDimmingButtonOnce();
         defaultBackgroundPlaybackOnce();
+    }
+
+    /**
+     * Init that upstream does only in SplashPresenter. After a process death the system can
+     * recreate an activity (or a START_STICKY service) without Splash ever running, and the
+     * missing RxJava error handler turns the first undeliverable network error into a crash.
+     * Both calls are idempotent, so the later run from SplashPresenter is harmless.
+     */
+    private void initEarly() {
+        RxHelper.setupGlobalErrorHandler();
+        GlobalPreferences.instance(this);
+    }
+
+    /**
+     * RemoteControlService is START_STICKY: if the process is killed during playback, Android
+     * revives it later with no player, and the foreground service then pins the idle process in
+     * memory indefinitely. Stop it unless the user enabled device link (its real purpose).
+     */
+    private void stopOrphanedRemoteControlService() {
+        if (RemoteControlData.instance(this).isDeviceLinkEnabled()) {
+            return;
+        }
+        if (PlaybackPresenter.instance(this).getView() != null) {
+            return;
+        }
+        Utils.stopService(this, RemoteControlService.class);
     }
 
     /**

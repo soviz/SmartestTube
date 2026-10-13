@@ -54,6 +54,7 @@ import com.liskovsoft.smartyoutubetv2.common.app.presenters.ChannelPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.PlaybackPresenter;
 import com.liskovsoft.smartyoutubetv2.common.misc.MediaServiceManager;
 import com.liskovsoft.smartyoutubetv2.common.misc.RemoteControlService;
+import com.liskovsoft.smartyoutubetv2.common.prefs.RemoteControlData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerData;
 import com.liskovsoft.smartyoutubetv2.common.utils.AppDialogUtil;
 import com.liskovsoft.smartyoutubetv2.tv.R;
@@ -276,8 +277,18 @@ public class MobilePlaybackFragment extends PlaybackFragment {
         if (mSessionToken != null) {
             intent.putExtra(RemoteControlService.EXTRA_SESSION_TOKEN, mSessionToken);
             ContextCompat.startForegroundService(ctx, intent);
+        } else if (RemoteControlData.instance(ctx).isDeviceLinkEnabled()) {
+            try {
+                ctx.startService(intent); // revert to plain notification; service stays for remote control
+            } catch (IllegalStateException e) {
+                // Not allowed to start service Intent: app is in background (service not foreground)
+                e.printStackTrace();
+            }
         } else {
-            ctx.startService(intent); // revert to plain notification; service stays for remote control
+            // Player released and no device link: the foreground service has nothing left to do.
+            // Leaving it running pins the idle process in memory (and START_STICKY revives it
+            // after the system kills it), so stop it and let Android reclaim the process.
+            ctx.stopService(intent);
         }
     }
 
